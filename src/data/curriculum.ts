@@ -34,6 +34,21 @@ export type LearningModule = {
   milestones: string[];
 };
 
+export type ModelFamily = {
+  name: string;
+  family: string;
+  summary: string;
+  intuition: string;
+  professionalUse: string;
+  failureMode: string;
+  evaluateWith: string;
+  learnAfter: string;
+  sources: {
+    label: string;
+    href: string;
+  }[];
+};
+
 export const attentionLesson: LessonMeta = {
   slug: "attention-is-all-you-need",
   title: "Attention Is All You Need",
@@ -244,48 +259,148 @@ export const topics: Topic[] = [
   },
 ];
 
-export const models = [
+export const models: ModelFamily[] = [
   {
     name: "Transformer",
     family: "Architecture",
-    whyItMatters:
-      "The base architecture behind most modern large language models, vision-language models, and many generative systems.",
+    summary:
+      "A neural network architecture that lets every token compare itself with other tokens through attention.",
+    intuition:
+      "Think of a sentence as a table of word pieces. Attention lets each word piece ask which other pieces matter before the model updates its representation.",
+    professionalUse:
+      "Used as the backbone for many language, coding, vision-language, retrieval, and generative systems.",
+    failureMode:
+      "Attention can become expensive as context grows, and the model still needs training data, evaluation, and guardrails.",
+    evaluateWith:
+      "Task quality, latency, memory use, context-length behavior, and robustness on examples outside the training distribution.",
     learnAfter: "Attention Is All You Need",
+    sources: [
+      {
+        label: "Vaswani et al., Attention Is All You Need",
+        href: "https://arxiv.org/abs/1706.03762",
+      },
+      {
+        label: "Hugging Face Transformers model family summary",
+        href: "https://huggingface.co/docs/transformers/model_summary",
+      },
+    ],
   },
   {
     name: "BERT",
     family: "Encoder model",
-    whyItMatters:
-      "A landmark bidirectional encoder used for classification, retrieval, and representation learning.",
+    summary:
+      "A bidirectional Transformer encoder trained to understand text by filling in masked words.",
+    intuition:
+      "BERT reads the whole input at once, so a missing word can use clues from both the left and right sides of the sentence.",
+    professionalUse:
+      "Useful for classification, question answering, reranking, entity extraction, and text representations where generation is not the main task.",
+    failureMode:
+      "It is not naturally built to generate long free-form answers, and fine-tuned classifiers can fail when the production text differs from training examples.",
+    evaluateWith:
+      "Held-out classification accuracy, calibration, retrieval quality, bias checks, and error slices by domain or text length.",
     learnAfter: "Transformers and embeddings",
+    sources: [
+      {
+        label: "Devlin et al., BERT",
+        href: "https://arxiv.org/abs/1810.04805",
+      },
+    ],
   },
   {
     name: "GPT-style decoder",
     family: "Decoder model",
-    whyItMatters:
-      "The autoregressive pattern that predicts the next token and powers many conversational and coding systems.",
+    summary:
+      "A Transformer decoder trained to predict the next token from the tokens that came before it.",
+    intuition:
+      "The model writes one token at a time. After each token, that new token becomes part of the context for the next prediction.",
+    professionalUse:
+      "Powers chat, drafting, coding, summarization, extraction, tool calling, and agent planning workflows.",
+    failureMode:
+      "A fluent answer can still be wrong, unsupported, nondeterministic, or overconfident when the prompt lacks evidence.",
+    evaluateWith:
+      "Human preference tests, factuality checks, exact-match task tests, tool-call accuracy, cost, latency, and regression evals.",
     learnAfter: "Masked attention",
+    sources: [
+      {
+        label: "Radford et al., Improving Language Understanding by Generative Pre-Training",
+        href: "https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf",
+      },
+      {
+        label: "Brown et al., Language Models are Few-Shot Learners",
+        href: "https://arxiv.org/abs/2005.14165",
+      },
+    ],
   },
   {
     name: "CLIP",
     family: "Multimodal model",
-    whyItMatters:
-      "Connects images and text in a shared representation space, making it foundational for search and multimodal workflows.",
+    summary:
+      "A vision-language model that learns to match images with natural-language descriptions.",
+    intuition:
+      "CLIP pulls matching image and text vectors closer together and pushes mismatched pairs farther apart.",
+    professionalUse:
+      "Used for image search, zero-shot classification, moderation support, dataset filtering, and multimodal retrieval.",
+    failureMode:
+      "It can inherit dataset bias, miss fine-grained visual details, and behave poorly on domains unlike its pretraining data.",
+    evaluateWith:
+      "Zero-shot accuracy, retrieval recall, bias and safety tests, domain-specific visual audits, and false-positive review.",
     learnAfter: "Contrastive learning",
+    sources: [
+      {
+        label: "Radford et al., CLIP",
+        href: "https://arxiv.org/abs/2103.00020",
+      },
+      {
+        label: "OpenAI CLIP research post",
+        href: "https://openai.com/research/clip",
+      },
+    ],
   },
   {
     name: "Diffusion model",
     family: "Generative model",
-    whyItMatters:
-      "Generates images and other media by learning to reverse a gradual noising process.",
+    summary:
+      "A generative model that learns to create data by reversing a gradual noising process.",
+    intuition:
+      "Training teaches the model how to remove a little noise at each step. Sampling starts from noise and repeatedly denoises toward an image or other output.",
+    professionalUse:
+      "Common in image generation, editing, design prototyping, synthetic data, audio generation, and some scientific modeling.",
+    failureMode:
+      "Outputs may contain artifacts, unsafe content, memorized styles, prompt mismatch, or inconsistent details across generations.",
+    evaluateWith:
+      "Human review, prompt adherence, diversity, safety filters, artifact rates, and task-specific metrics such as FID when appropriate.",
     learnAfter: "Probability basics",
+    sources: [
+      {
+        label: "Ho et al., Denoising Diffusion Probabilistic Models",
+        href: "https://arxiv.org/abs/2006.11239",
+      },
+    ],
   },
   {
     name: "Embedding model",
     family: "Representation model",
-    whyItMatters:
-      "Turns text, images, or other inputs into vectors that can be searched, clustered, compared, and retrieved.",
+    summary:
+      "A model that turns input into vectors: lists of numbers that preserve useful similarity relationships.",
+    intuition:
+      "If two passages mean similar things, a good embedding model places their vectors near each other even when they use different words.",
+    professionalUse:
+      "Central to retrieval-augmented generation, semantic search, recommendation, clustering, deduplication, and memory systems.",
+    failureMode:
+      "Bad chunking, weak metadata, domain mismatch, or the wrong similarity threshold can retrieve plausible but irrelevant evidence.",
+    evaluateWith:
+      "Recall at k, mean reciprocal rank, grounded-answer quality, latency, storage cost, and query-specific failure analysis.",
     learnAfter: "Vector spaces",
+    sources: [
+      {
+        label: "OpenAI embeddings guide",
+        href: "https://platform.openai.com/docs/guides/embeddings",
+      },
+      {
+        label: "OpenAI text and code embeddings paper",
+        href: "https://cdn.openai.com/papers/Text_and_Code_Embeddings_by_Contrastive_Pre_Training.pdf",
+      },
+    ],
   },
 ];
 

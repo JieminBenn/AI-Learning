@@ -36,6 +36,13 @@ Every major lesson should include:
 - Primary-source citations.
 - Additional implementation resources, especially official docs, GitHub repositories, notebooks, or examples.
 
+## Code Change Verification
+
+- Whenever a user request or command results in code, content, data, styling, configuration, or behavior changes, verify the change before calling it complete.
+- The verification must be appropriate to the change: run type checks, lint, tests, builds, local render checks, browser checks, or targeted content checks when they apply.
+- After verification, review the changed work against the user's goal and this project's zero-to-professional teaching standard: it should be correct, bug-resistant, beginner-accessible, professionally useful, and aligned with the intended learning outcome.
+- Do not present a code-changing task as finished until you have checked that it achieves the requested goal, looked for likely bugs or regressions, and reported any verification that could not be completed.
+
 ## Scope Discipline
 
 The first milestone is an MVP curriculum, not a finished encyclopedia. The "Attention Is All You Need" lesson is the depth benchmark. Other topic hubs may be scaffolded, but they should clearly state the intended professional outcomes and future lesson path.

@@ -1222,8 +1222,9 @@ button {
 
 .model-card {
   display: grid;
-  gap: 14px;
-  min-height: 240px;
+  align-content: start;
+  gap: 16px;
+  min-height: 520px;
   padding: 20px;
 }
 
@@ -1231,9 +1232,131 @@ button {
   color: var(--plum);
 }
 
+.model-card dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.model-card dt {
+  margin-bottom: 4px;
+  color: var(--teal-dark);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.model-card dd {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .model-card small {
   align-self: end;
   color: var(--teal-dark);
+}
+
+.models-intro {
+  padding-bottom: 24px;
+}
+
+.model-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.model-flow div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 136px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  box-shadow: 0 8px 24px rgb(23 33 43 / 6%);
+}
+
+.model-flow div:nth-child(2) {
+  background: #edf8f1;
+}
+
+.model-flow div:nth-child(3) {
+  background: #fff8e8;
+}
+
+.model-flow strong,
+.model-decision-list h3 {
+  font-size: 1.02rem;
+}
+
+.model-flow span,
+.model-comparison p,
+.model-equation p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.model-comparison,
+.model-equation,
+.model-sources {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(320px, 1.2fr);
+  gap: clamp(18px, 4vw, 40px);
+  align-items: start;
+}
+
+.model-comparison h2,
+.model-equation h2,
+.model-sources h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3.5vw, 3.2rem);
+  line-height: 1.08;
+}
+
+.model-decision-list {
+  display: grid;
+  gap: 12px;
+}
+
+.model-decision-list article {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  box-shadow: 0 8px 24px rgb(23 33 43 / 6%);
+}
+
+.model-decision-list svg {
+  color: var(--coral);
+}
+
+.model-decision-list h3 {
+  margin: 0;
+}
+
+.model-decision-list p {
+  margin: 0;
+}
+
+.model-equation .equation-block {
+  margin: 0;
+}
+
+.model-checks {
+  padding-top: 24px;
+}
+
+.model-checks .check-list {
+  max-width: 980px;
+}
+
+.model-sources {
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 1100px) {
@@ -1243,7 +1366,10 @@ button {
   .roadmap-layout,
   .curriculum-board,
   .two-column,
-  .source-band {
+  .source-band,
+  .model-comparison,
+  .model-equation,
+  .model-sources {
     grid-template-columns: 1fr;
   }
 
@@ -1255,7 +1381,8 @@ button {
 
   .topic-sidebar nav,
   .path-grid,
-  .topic-grid {
+  .topic-grid,
+  .model-flow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1367,6 +1494,7 @@ button {
   .topic-grid,
   .model-grid,
   .model-dashboard,
+  .model-flow,
   .diagram-grid,
   .diagram-grid.compact,
   .argument-flow,
