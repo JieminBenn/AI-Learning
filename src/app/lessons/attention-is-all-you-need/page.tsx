@@ -3,9 +3,9 @@ import { LessonShell } from "@/components/LessonShell";
 import { attentionLesson } from "@/data/curriculum";
 
 export const metadata = {
-  title: "Attention Is All You Need | Astra AI Academy",
+  title: "Attention Is All You Need Explained for AI Engineers",
   description:
-    "A beginner-friendly professional lesson on the Transformer paper, with diagrams, equations, and practice checks.",
+    "A beginner-friendly but deep guide to the Transformer paper, covering attention, embeddings, positional encodings, encoder-decoder flow, equations, experiments, and production tradeoffs.",
 };
 
 export default function AttentionLessonPage() {

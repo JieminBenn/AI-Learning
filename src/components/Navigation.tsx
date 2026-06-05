@@ -11,7 +11,7 @@ export function Navigation() {
     <header className="site-header">
       <Link className="brand" href="/">
         <BrainCircuit aria-hidden="true" size={24} />
-        <span>Astra AI Academy</span>
+        <span>AI Engineering Mastery</span>
       </Link>
       <nav aria-label="Primary navigation">
         {navItems.map((item) => {

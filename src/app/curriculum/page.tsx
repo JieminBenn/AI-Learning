@@ -4,8 +4,9 @@ import { LearningModuleCard } from "@/components/LearningModuleCard";
 import { attentionLesson, learningModules, topics } from "@/data/curriculum";
 
 export const metadata = {
-  title: "Curriculum Overview | Astra AI Academy",
-  description: "A beginner-to-professional AI engineering curriculum overview.",
+  title: "AI Engineering Curriculum Overview",
+  description:
+    "A beginner-to-professional AI engineering curriculum covering Transformers, LLM foundations, RAG, agents, data pipelines, training, fine-tuning, and infrastructure.",
 };
 
 export default function CurriculumPage() {

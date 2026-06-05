@@ -2,8 +2,9 @@ import { Brain, Layers3, SearchCheck } from "lucide-react";
 import { models } from "@/data/curriculum";
 
 export const metadata = {
-  title: "Must-Know Models | Astra AI Academy",
-  description: "A data-driven explorer for the models and model families AI professionals should know.",
+  title: "Must-Know AI Models and Model Families",
+  description:
+    "A curated guide to the model families AI engineers should know, including Transformers, BERT, GPT-style decoders, CLIP, diffusion models, and embedding models.",
 };
 
 export default function ModelsPage() {

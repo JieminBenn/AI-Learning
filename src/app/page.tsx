@@ -14,6 +14,12 @@ import {
 import { ConceptDiagram } from "@/components/ConceptDiagram";
 import { learningModules } from "@/data/curriculum";
 
+export const metadata = {
+  title: "AI Engineering Mastery: Learn AI Engineering From First Principles",
+  description:
+    "A practical AI engineering curriculum for beginners and builders: Transformers, LLMs, RAG, AI agents, fine-tuning, model literacy, and production AI infrastructure.",
+};
+
 const moduleIcons = [
   Network,
   BrainCircuit,
@@ -49,11 +55,13 @@ export default function HomePage() {
       <section className="hero">
         <div className="hero__copy">
           <span className="eyebrow">From zero foundation to professional AI work</span>
-          <h1>Astra AI Academy</h1>
+          <h1>AI Engineering Mastery</h1>
           <p>
-            Learn the ideas, math, systems, and engineering judgment behind modern AI.
-            Start with plain-language intuition, then climb toward papers, architectures,
-            production workflows, and professional-grade reasoning.
+            Learn artificial intelligence engineering from first principles: Transformers,
+            large language models, retrieval-augmented generation, AI agents, fine-tuning,
+            model literacy, and production infrastructure. Start with plain-language
+            intuition, then climb toward papers, architectures, workflows, and professional
+            reasoning.
           </p>
           <div className="hero__actions">
             <Link className="button button--primary" href="#learning-roadmap">

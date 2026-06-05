@@ -1,7 +1,19 @@
 {
-  "name": "ai-professional-learning",
+  "name": "ai-engineering-mastery",
   "version": "0.1.0",
+  "description": "A beginner-friendly AI engineering curriculum covering Transformers, LLMs, RAG, AI agents, fine-tuning, model literacy, and production AI infrastructure.",
   "private": true,
+  "keywords": [
+    "ai-engineering",
+    "machine-learning-engineering",
+    "llm",
+    "transformers",
+    "rag",
+    "ai-agents",
+    "fine-tuning",
+    "ai-infrastructure",
+    "model-literacy"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

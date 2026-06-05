@@ -30,8 +30,8 @@ export async function generateMetadata({ params }: TopicPageProps) {
   }
 
   return {
-    title: `${topic.title} | Astra AI Academy`,
-    description: topic.summary,
+    title: `${topic.title} for AI Engineers`,
+    description: `${topic.summary} Learn the professional outcomes, essential concepts, capstone path, and primary sources for ${topic.title}.`,
   };
 }
 
