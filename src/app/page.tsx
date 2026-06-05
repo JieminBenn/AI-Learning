@@ -12,7 +12,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ConceptDiagram } from "@/components/ConceptDiagram";
-import { learningModules } from "@/data/curriculum";
+import { aiSystemsLesson, learningModules } from "@/data/curriculum";
 
 export const metadata = {
   title: "AI Engineering Mastery: Learn AI Engineering From First Principles",
@@ -49,8 +49,14 @@ const roadmapDestinations: Record<string, { href: string; label: string }[]> = {
     { href: "/topics/skills", label: "Open Tool Skills build path" },
   ],
   "Data Pipelines": [{ href: "/lessons/data-pipelines", label: "Open Data Pipelines lesson" }],
-  "Fine-Tuning": [{ href: "/topics/fine-tuning", label: "Open Fine-Tuning build path" }],
-  "AI Systems": [{ href: "/topics/ai-infra", label: "Open AI Infrastructure build path" }],
+  "Fine-Tuning": [
+    { href: "/lessons/fine-tuning", label: "Open Fine-Tuning lesson" },
+    { href: "/topics/fine-tuning", label: "Open Fine-Tuning build path" },
+  ],
+  "AI Systems": [
+    { href: `/lessons/${aiSystemsLesson.slug}`, label: "Open AI Systems lesson" },
+    { href: "/topics/ai-infra", label: "Open AI Infrastructure build path" },
+  ],
 };
 
 function getModuleId(title: string) {

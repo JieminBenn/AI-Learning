@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
 import {
   agentsAndToolUseLesson,
+  aiSystemsLesson,
   attentionLesson,
   dataPipelinesLesson,
+  fineTuningLesson,
   llmFoundationsLesson,
   ragSystemsLesson,
   topics,
@@ -52,6 +54,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${baseUrl}/lessons/${dataPipelinesLesson.slug}`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/lessons/${fineTuningLesson.slug}`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/lessons/${aiSystemsLesson.slug}`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.9,

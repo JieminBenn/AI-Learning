@@ -310,6 +310,152 @@ export const dataPipelinesLesson: LessonMeta = {
   ],
 };
 
+export const fineTuningLesson: LessonMeta = {
+  slug: "fine-tuning",
+  title: "Fine-Tuning",
+  level: "Builder",
+  prerequisites: [
+    "Complete LLM Foundations and Data Pipelines first, or know what tokens, loss, datasets, validation splits, and evaluation sets are",
+    "No GPU training experience required",
+    "Comfort with simple probability and matrices helps, but every symbol is explained",
+  ],
+  tags: ["Fine-Tuning", "SFT", "LoRA", "Evaluation", "Model Adaptation"],
+  objectives: [
+    "Define fine-tuning, supervised fine-tuning, instruction tuning, full fine-tuning, parameter-efficient fine-tuning, LoRA, QLoRA, preference optimization, train split, validation split, test split, loss, epoch, overfitting, and catastrophic forgetting from first principles.",
+    "Decide when fine-tuning is a better fit than prompting, RAG, tool use, or workflow changes.",
+    "Trace how examples become training batches, loss values, parameter updates, checkpoints, and a deployable adapted model.",
+    "Read the supervised fine-tuning objective and the LoRA update equation, then explain every symbol.",
+    "Prepare a beginner-friendly dataset plan with formatting, quality checks, splits, privacy review, and evaluation cases.",
+    "Diagnose production failures such as memorization, style overfitting, regression on general capability, benchmark leakage, safety drift, and weak baseline comparisons.",
+  ],
+  outcomes: [
+    "You can explain what changes inside a model during fine-tuning without treating training as magic.",
+    "You can choose between prompting, RAG, full fine-tuning, LoRA/QLoRA, and preference tuning based on the behavior you need.",
+    "You can design the evaluation and release checks required before putting a fine-tuned model into a user-facing workflow.",
+  ],
+  sources: [
+    {
+      label: "Ouyang et al., Training language models to follow instructions with human feedback",
+      href: "https://arxiv.org/abs/2203.02155",
+    },
+    {
+      label: "Hu et al., LoRA: Low-Rank Adaptation of Large Language Models",
+      href: "https://arxiv.org/abs/2106.09685",
+    },
+    {
+      label: "Dettmers et al., QLoRA: Efficient Finetuning of Quantized LLMs",
+      href: "https://arxiv.org/abs/2305.14314",
+    },
+    {
+      label: "Rafailov et al., Direct Preference Optimization",
+      href: "https://arxiv.org/abs/2305.18290",
+    },
+    {
+      label: "OpenAI supervised fine-tuning guide",
+      href: "https://platform.openai.com/docs/guides/supervised-fine-tuning",
+    },
+    {
+      label: "OpenAI fine-tuning platform update",
+      href: "https://openai.com/index/introducing-improvements-to-the-fine-tuning-api-and-expanding-our-custom-models-program/",
+    },
+    {
+      label: "OpenAI fine-tuning API reference",
+      href: "https://platform.openai.com/docs/api-reference/fine-tuning",
+    },
+    {
+      label: "Hugging Face PEFT documentation",
+      href: "https://huggingface.co/docs/peft/index",
+    },
+    {
+      label: "Hugging Face TRL SFTTrainer documentation",
+      href: "https://huggingface.co/docs/trl/sft_trainer",
+    },
+    {
+      label: "Hugging Face TRL GitHub repository",
+      href: "https://github.com/huggingface/trl",
+    },
+    {
+      label: "Hugging Face PEFT GitHub repository",
+      href: "https://github.com/huggingface/peft",
+    },
+    {
+      label: "Axolotl GitHub repository",
+      href: "https://github.com/axolotl-ai-cloud/axolotl",
+    },
+    {
+      label: "LLaMA Factory GitHub repository",
+      href: "https://github.com/hiyouga/LLaMA-Factory",
+    },
+  ],
+};
+
+export const aiSystemsLesson: LessonMeta = {
+  slug: "ai-systems",
+  title: "AI Systems",
+  level: "Professional",
+  prerequisites: [
+    "Complete LLM Foundations, RAG Systems, Agents and Tool Use, Data Pipelines, and Fine-Tuning first, or know what model calls, retrieval, tools, datasets, and evaluations are",
+    "No site reliability engineering background required",
+    "Comfort with APIs, percentages, and simple arithmetic helps, but every operational metric is explained",
+  ],
+  tags: ["AI Systems", "Infrastructure", "Serving", "Observability", "Evaluation"],
+  objectives: [
+    "Define AI system, inference, serving path, orchestration, fallback, latency, throughput, cache, batch, trace, span, metric, log, service-level indicator, service-level objective, error budget, evaluation gate, cost model, and incident response from first principles.",
+    "Trace a production AI request through policy checks, prompt assembly, retrieval, tool calls, model inference, validation, response delivery, logging, monitoring, and evaluation.",
+    "Explain why production AI reliability depends on both model quality and ordinary distributed-systems reliability.",
+    "Read latency, throughput, cache hit rate, and cost equations, then explain every symbol.",
+    "Compare streaming, batching, caching, smaller models, retrieval shortcuts, fallbacks, and human review as practical system design tradeoffs.",
+    "Diagnose production failures such as slow responses, runaway cost, stale prompts, retrieval outages, missing traces, evaluation regressions, privacy leaks, and weak incident rollback plans.",
+  ],
+  outcomes: [
+    "You can explain the moving parts around a model that make an AI feature production-ready.",
+    "You can design the first observability, evaluation, reliability, and cost controls for a real AI workflow.",
+    "You can reason about whether a bad user experience came from model behavior, data, orchestration, infrastructure, permissions, or release process.",
+  ],
+  sources: [
+    {
+      label: "OpenAI production best practices",
+      href: "https://platform.openai.com/docs/guides/production-best-practices",
+    },
+    {
+      label: "OpenTelemetry GenAI semantic conventions",
+      href: "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+    },
+    {
+      label: "MLflow GenAI tracing documentation",
+      href: "https://mlflow.org/docs/latest/genai/tracing/",
+    },
+    {
+      label: "Google SRE Book: Monitoring Distributed Systems",
+      href: "https://sre.google/sre-book/monitoring-distributed-systems/",
+    },
+    {
+      label: "Google SRE Book: Service Level Objectives",
+      href: "https://sre.google/sre-book/service-level-objectives/",
+    },
+    {
+      label: "Anthropic evaluation tool documentation",
+      href: "https://platform.claude.com/docs/en/test-and-evaluate/eval-tool",
+    },
+    {
+      label: "OpenAI Cookbook GitHub repository",
+      href: "https://github.com/openai/openai-cookbook",
+    },
+    {
+      label: "Promptfoo GitHub repository",
+      href: "https://github.com/promptfoo/promptfoo",
+    },
+    {
+      label: "MLflow GitHub repository",
+      href: "https://github.com/mlflow/mlflow",
+    },
+    {
+      label: "OpenTelemetry GenAI semantic conventions GitHub repository",
+      href: "https://github.com/open-telemetry/semantic-conventions-genai",
+    },
+  ],
+};
+
 export const topics: Topic[] = [
   {
     slug: "rag",
@@ -421,6 +567,10 @@ export const topics: Topic[] = [
         href: "https://platform.openai.com/docs/guides/supervised-fine-tuning",
       },
       {
+        label: "OpenAI fine-tuning platform update",
+        href: "https://openai.com/index/introducing-improvements-to-the-fine-tuning-api-and-expanding-our-custom-models-program/",
+      },
+      {
         label: "OpenAI fine-tuning API reference",
         href: "https://platform.openai.com/docs/api-reference/fine-tuning",
       },
@@ -431,6 +581,18 @@ export const topics: Topic[] = [
       {
         label: "Hugging Face TRL supervised fine-tuning documentation",
         href: "https://huggingface.co/docs/trl/en/sft_trainer",
+      },
+      {
+        label: "Hugging Face TRL GitHub repository",
+        href: "https://github.com/huggingface/trl",
+      },
+      {
+        label: "Axolotl GitHub repository",
+        href: "https://github.com/axolotl-ai-cloud/axolotl",
+      },
+      {
+        label: "LLaMA Factory GitHub repository",
+        href: "https://github.com/hiyouga/LLaMA-Factory",
       },
     ],
   },
@@ -509,6 +671,18 @@ export const topics: Topic[] = [
       {
         label: "Anthropic evaluation tool documentation",
         href: "https://platform.claude.com/docs/en/test-and-evaluate/eval-tool",
+      },
+      {
+        label: "OpenAI Cookbook GitHub repository",
+        href: "https://github.com/openai/openai-cookbook",
+      },
+      {
+        label: "Promptfoo GitHub repository",
+        href: "https://github.com/promptfoo/promptfoo",
+      },
+      {
+        label: "MLflow GitHub repository",
+        href: "https://github.com/mlflow/mlflow",
       },
     ],
   },

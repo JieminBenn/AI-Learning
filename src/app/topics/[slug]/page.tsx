@@ -12,9 +12,9 @@ type TopicPageProps = {
 const diagramBySlug = {
   rag: "rag",
   agents: "agent",
-  "fine-tuning": "attention",
+  "fine-tuning": "fineTuning",
   skills: "agent",
-  "ai-infra": "transformer",
+  "ai-infra": "aiSystem",
 } as const;
 
 export function generateStaticParams() {

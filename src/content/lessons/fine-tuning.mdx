@@ -1,0 +1,767 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson teaches fine-tuning for language models. Fine-tuning means taking a model that already knows broad language patterns and training it further on examples that represent a behavior you want.
+
+The goal is not to convince you that every AI product should fine-tune a model. Most teams should first try better instructions, retrieval-augmented generation, tool use, data cleanup, and evaluation. Fine-tuning becomes useful when the desired behavior is stable, repeated, hard to express in a prompt, and measurable with held-out examples.
+
+We will move from intuition to professional practice:
+
+1. What fine-tuning changes.
+2. When fine-tuning is the right tool.
+3. How supervised fine-tuning works.
+4. How data quality, splits, and leakage decide whether results are real.
+5. How LoRA and QLoRA reduce training cost.
+6. How preference tuning differs from supervised examples.
+7. How to evaluate a fine-tuned model before release.
+8. What breaks in production and how engineers diagnose it.
+
+## Explain it in 5 minutes
+
+A pretrained language model has already learned broad patterns from huge text and code datasets. It can predict likely next tokens, follow many instructions, and generate fluent outputs. But broad ability is not the same as your exact production behavior.
+
+Fine-tuning adapts the model with additional training examples. A <GlossaryTerm term="training example">one input-output case used to teach a model a desired behavior.</GlossaryTerm> For a support assistant, an example might contain a customer question, relevant constraints, and the ideal answer. During training, the model produces probabilities for the target answer tokens. The training system measures error, then updates model parameters or adapter weights so the target answer becomes more likely next time.
+
+<ConceptDiagram type="fineTuning" />
+
+Think of the model as a very capable writer who already knows grammar, code, and many facts. Prompting is giving that writer instructions at work time. Retrieval-augmented generation, or RAG, is handing the writer source documents at work time. Fine-tuning is rehearsal before work time: repeated examples teach a stable response pattern.
+
+The key professional question is:
+
+<EquationBlock title="Fine-tuning decision" equation={"fine_tune only if stable_behavior + high_quality_examples + reliable_eval > prompt_or_RAG_baseline"}>
+This is not a mathematical law. It is a decision rule. Fine-tuning should beat a simpler baseline on a reliable evaluation set before it earns production complexity.
+</EquationBlock>
+
+Fine-tuning does not automatically add fresh knowledge, guarantee truth, or remove the need for evaluation. It can make a model more consistent, more domain-shaped, less verbose, better at a narrow format, or better aligned with preferences. It can also memorize private data, overfit to training style, regress on general ability, or become worse on edge cases.
+
+<CheckUnderstanding prompt="What is the shortest accurate description of fine-tuning?">
+Fine-tuning further trains an already pretrained model on curated examples so a target behavior becomes more likely, then engineers evaluate whether that behavior improved without unacceptable regressions.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define fine-tuning, supervised fine-tuning, instruction tuning, full fine-tuning, parameter-efficient fine-tuning, LoRA, QLoRA, preference optimization, train split, validation split, test split, loss, epoch, learning rate, overfitting, and catastrophic forgetting.
+- Decide when fine-tuning is better than prompting, RAG, tool use, or workflow changes.
+- Trace a fine-tuning run from examples to batches, loss, parameter updates, checkpoints, validation, and deployment.
+- Read the supervised fine-tuning objective and explain every symbol.
+- Read the LoRA update equation and explain every symbol.
+- Design a dataset and evaluation plan that can catch regressions.
+- Identify production failure modes and the controls that reduce risk.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- A <GlossaryTerm term="large language model">a neural network trained to predict and generate token sequences.</GlossaryTerm>
+- A <GlossaryTerm term="token">a small text unit processed by a model, such as a word piece, punctuation mark, or special symbol.</GlossaryTerm>
+- A <GlossaryTerm term="parameter">a learned number inside a model.</GlossaryTerm> Training changes parameters so predictions improve.
+- A <GlossaryTerm term="dataset">a collection of examples used for training, validation, testing, retrieval, or evaluation.</GlossaryTerm>
+- A <GlossaryTerm term="loss">a number that measures how wrong the model was on training examples.</GlossaryTerm> Lower loss usually means the model assigned higher probability to the target tokens.
+- A <GlossaryTerm term="evaluation set">examples reserved to measure behavior.</GlossaryTerm> Evaluation examples should not be used to train the model.
+- A <GlossaryTerm term="baseline">the result from a simpler or previous system used for comparison.</GlossaryTerm>
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Fine-tuning</td>
+        <td>Training an existing model more.</td>
+        <td>Adapts pretrained behavior using additional examples, usually with a smaller dataset than pretraining.</td>
+      </tr>
+      <tr>
+        <td>Supervised fine-tuning</td>
+        <td>Training from input and desired output examples.</td>
+        <td>Commonly shortened to SFT; improves imitation of target responses, formats, styles, or task procedures.</td>
+      </tr>
+      <tr>
+        <td>Instruction tuning</td>
+        <td>Fine-tuning on examples written as instructions and answers.</td>
+        <td>Teaches a model to follow natural-language task requests rather than only continue text.</td>
+      </tr>
+      <tr>
+        <td>Full fine-tuning</td>
+        <td>Updating all or most model weights.</td>
+        <td>Powerful but expensive; stores a full adapted model and can increase regression risk.</td>
+      </tr>
+      <tr>
+        <td>Parameter-efficient fine-tuning</td>
+        <td>Updating a small number of extra trainable weights.</td>
+        <td>Often shortened to PEFT; lowers memory, cost, and storage needs by keeping most base weights frozen.</td>
+      </tr>
+      <tr>
+        <td>LoRA</td>
+        <td>A method that trains small low-rank adapter matrices.</td>
+        <td>Low-Rank Adaptation freezes pretrained weights and learns a compact update that can be merged or loaded as an adapter.</td>
+      </tr>
+      <tr>
+        <td>QLoRA</td>
+        <td>LoRA with a quantized base model.</td>
+        <td>Backpropagates through a frozen low-bit model into LoRA adapters to reduce memory during fine-tuning.</td>
+      </tr>
+      <tr>
+        <td>Preference optimization</td>
+        <td>Training from comparisons between better and worse outputs.</td>
+        <td>Used when the target behavior is easier to rank than to write as one perfect answer.</td>
+      </tr>
+      <tr>
+        <td>Overfitting</td>
+        <td>Doing well on training examples but poorly on new examples.</td>
+        <td>A release risk when the model memorizes narrow data patterns instead of learning robust behavior.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: What changes during fine-tuning?
+
+A language model predicts the next token using learned parameters. During fine-tuning, training examples produce an error signal. An optimizer uses that signal to adjust trainable weights.
+
+There are two broad ways to adapt the model.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Approach</th>
+        <th>What changes</th>
+        <th>Why teams use it</th>
+        <th>Main risk</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Full fine-tuning</td>
+        <td>All or most base model parameters.</td>
+        <td>Maximum flexibility for deep domain adaptation.</td>
+        <td>High compute, storage, and regression risk.</td>
+      </tr>
+      <tr>
+        <td>Adapter or LoRA fine-tuning</td>
+        <td>A small set of added trainable weights.</td>
+        <td>Lower memory and cheaper experimentation.</td>
+        <td>May underfit if the behavior requires deeper changes.</td>
+      </tr>
+      <tr>
+        <td>Prompt tuning or soft prompts</td>
+        <td>Learned prompt-like vectors.</td>
+        <td>Small adaptation footprint.</td>
+        <td>Less transparent to beginners and not always enough for complex behavior.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The professional point is that "fine-tuned model" does not tell you how much of the model changed. A managed provider might expose a fine-tuned model ID. An open-source workflow might store a base model plus LoRA adapter files. A research project might update every parameter.
+
+Fine-tuning changes behavior statistically. It does not install a rule in the way a software engineer writes an `if` statement. If you train on many concise support replies, the model may become more concise. If you train on JSON responses, it may become more likely to produce JSON. But you still need validation, parsing, retries, and evaluation because probabilistic models can fail.
+
+<Quiz
+  question="Which statement is most accurate?"
+  options={[
+    "Fine-tuning changes model behavior by updating trainable weights from examples, but it does not guarantee perfect rule-following.",
+    "Fine-tuning stores every new fact in a searchable database.",
+    "Fine-tuning removes the need for evaluation because the model has already seen examples.",
+  ]}
+  correctIndex={0}
+  explanation="Fine-tuning is training, not retrieval or formal verification. It can improve behavior, but teams still need evaluation and system safeguards."
+/>
+
+## Section 2: Fine-tuning vs prompting vs RAG
+
+Fine-tuning is expensive compared with changing a prompt. It is also less direct than RAG for knowledge that changes often. Choose it when the failure is behavioral, repeated, stable, and measurable.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Problem</th>
+        <th>Usually try first</th>
+        <th>Fine-tuning helps when</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>The model does not know current policy.</td>
+        <td>RAG or tool lookup.</td>
+        <td>The policy style is stable, but facts still need retrieval.</td>
+      </tr>
+      <tr>
+        <td>The model ignores a response format.</td>
+        <td>Prompting, schemas, constrained decoding, validation.</td>
+        <td>The format is repeated across many calls and examples beat instructions.</td>
+      </tr>
+      <tr>
+        <td>The model writes with the wrong tone.</td>
+        <td>Prompt examples and style guide.</td>
+        <td>The target voice is stable and hard to capture in a short prompt.</td>
+      </tr>
+      <tr>
+        <td>The model needs private source facts.</td>
+        <td>RAG with permissions and citations.</td>
+        <td>The model also needs a learned domain-specific response pattern.</td>
+      </tr>
+      <tr>
+        <td>The model chooses the wrong tool.</td>
+        <td>Better tool descriptions, narrower schemas, traces, evals.</td>
+        <td>The tool-selection pattern is repeated and you have labeled examples.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+A useful rule:
+
+<EquationBlock title="Knowledge vs behavior" equation={"use RAG for changing knowledge; use fine_tuning for stable behavior"}>
+Changing knowledge means facts, policies, prices, documents, or records that must stay current. Stable behavior means style, format, classification boundary, tool-selection habit, or domain-specific procedure.
+</EquationBlock>
+
+This rule has exceptions. Some teams fine-tune small models to internalize a limited task and reduce latency. Others combine RAG with fine-tuning: RAG supplies evidence, while fine-tuning teaches the model how to use evidence and answer in a domain-specific way.
+
+Provider capabilities also change. As of June 2026, engineers should check current provider documentation before planning a managed fine-tuning workflow. OpenAI's May 8, 2026 platform update says the fine-tuning platform is no longer accessible to new users, while existing active users can continue creating training jobs for a limited transition period. Open-source fine-tuning libraries such as Hugging Face Transformers, PEFT, and TRL remain active implementation paths.
+
+<SourceCitation label="OpenAI supervised fine-tuning guide" href="https://platform.openai.com/docs/guides/supervised-fine-tuning" />
+<SourceCitation label="OpenAI fine-tuning platform update" href="https://openai.com/index/introducing-improvements-to-the-fine-tuning-api-and-expanding-our-custom-models-program/" />
+
+<CheckUnderstanding prompt="Why is RAG usually better than fine-tuning for current company policy?">
+Because RAG retrieves current source material at answer time. Fine-tuning bakes behavior into weights or adapters and is not a convenient way to update changing facts.
+</CheckUnderstanding>
+
+## Section 3: Supervised fine-tuning
+
+<GlossaryTerm term="Supervised fine-tuning">fine-tuning from examples where each input has a desired output.</GlossaryTerm> The model is trained to make the target output tokens more likely.
+
+For a chat model, one training example may look like this:
+
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Answer as a careful billing support specialist."
+    },
+    {
+      "role": "user",
+      "content": "Can I get a refund for an enterprise renewal after 20 days?"
+    },
+    {
+      "role": "assistant",
+      "content": "Enterprise renewals are refundable for 14 days after the invoice date if new seats have not been activated. Because this request is after 20 days, it is outside the standard refund window. Escalate only if the account has a contractual exception."
+    }
+  ]
+}
+```
+
+The exact format depends on the training stack. A provider API might require JSON Lines files. Hugging Face TRL can train from conversational, instruction-style, or plain text datasets depending on the trainer and formatting function.
+
+The supervised objective is close to ordinary language modeling, but the important target is the assistant response.
+
+<EquationBlock title="Supervised fine-tuning objective" equation={"minimize L(theta) = - sum_{i=1}^{N} sum_{t=1}^{T_i} log P_theta(y_{i,t} | x_i, y_{i,<t})"}>
+`L(theta)` is the loss for model parameters `theta`. `N` is the number of training examples. `i` indexes one example. `T_i` is the number of target tokens in example `i`. `y_{i,t}` is target token `t` in the desired output. `y_{i,<t}` means the earlier target tokens. `x_i` is the input or prompt. `P_theta(...)` is the probability the model with parameters `theta` assigns to the correct next target token. Training minimizes the negative log probability of the desired outputs.
+</EquationBlock>
+
+Plain language: when the target answer says "refund", the model should assign higher probability to "refund" at that position. If it assigns low probability, the loss is high. The optimizer changes trainable weights so target tokens become more likely across many examples.
+
+The InstructGPT paper is a landmark example of post-training. The authors first trained a model on human-written demonstrations, then trained a reward model from human preference comparisons, then used reinforcement learning to optimize the policy. Their human evaluations found that a smaller instruction-following model could be preferred over a much larger base GPT-3 model on their prompt distribution. The lesson for engineers is not "always copy RLHF." It is that targeted post-training data can change user-visible behavior dramatically.
+
+<SourceCitation label="Ouyang et al., Training language models to follow instructions with human feedback" href="https://arxiv.org/abs/2203.02155" />
+<SourceCitation label="Hugging Face TRL SFTTrainer documentation" href="https://huggingface.co/docs/trl/sft_trainer" />
+
+## Section 4: Dataset quality is the product
+
+Fine-tuning is often bottlenecked by examples, not algorithms. Weak examples teach weak behavior. Inconsistent labels teach inconsistency. Leaked evaluation examples make results look better than they are.
+
+A beginner-friendly dataset plan has four parts.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Part</th>
+        <th>Question to answer</th>
+        <th>Professional check</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Task definition</td>
+        <td>What behavior should change?</td>
+        <td>Write success and failure examples before collecting thousands of rows.</td>
+      </tr>
+      <tr>
+        <td>Example quality</td>
+        <td>Are the target outputs correct, safe, and representative?</td>
+        <td>Review examples with domain experts and remove contradictions.</td>
+      </tr>
+      <tr>
+        <td>Splits</td>
+        <td>Which examples are train, validation, and test?</td>
+        <td>Deduplicate across splits and freeze the test set before training.</td>
+      </tr>
+      <tr>
+        <td>Privacy</td>
+        <td>Does the data contain sensitive information?</td>
+        <td>Remove secrets, personal data, private keys, and content not permitted for training.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The three common splits are:
+
+- <GlossaryTerm term="Training split">examples used to update weights.</GlossaryTerm>
+- <GlossaryTerm term="Validation split">examples used during development to choose checkpoints, hyperparameters, or early stopping.</GlossaryTerm>
+- <GlossaryTerm term="Test split">examples held back for final evaluation.</GlossaryTerm>
+
+Do not train on the test set. That sounds obvious, but leakage happens in subtle ways. A near-duplicate support ticket in train and test can make the model look more capable than it is. A benchmark answer accidentally included in a prompt template can inflate results. A labeling guide that copies test answers can leak target behavior.
+
+<EquationBlock title="Simple split ratio" equation={"dataset = train 80% + validation 10% + test 10%"}>
+This ratio is only a starting point. Small or high-risk datasets may need cross-validation, manually curated test cases, or slice-based evaluations for rare but important failures.
+</EquationBlock>
+
+Good fine-tuning examples are boring in the best way: clear inputs, correct outputs, consistent formatting, explicit refusal cases, and representative edge cases. If the production distribution includes angry customers, malformed JSON, short questions, long context, and ambiguous requests, the evaluation set should include them too.
+
+<Quiz
+  question="Why should near-duplicate examples not appear in both training and test splits?"
+  options={[
+    "They can make evaluation look strong because the model has effectively rehearsed the test case.",
+    "They make the tokenizer stop working.",
+    "They guarantee the model will refuse every request.",
+  ]}
+  correctIndex={0}
+  explanation="Duplicates and near-duplicates create leakage. The test set should measure new behavior, not memorized examples."
+/>
+
+## Section 5: The training loop
+
+A fine-tuning run repeats a simple loop many times:
+
+1. Load a batch of examples.
+2. Tokenize inputs and target outputs.
+3. Run the model forward to predict target token probabilities.
+4. Compute loss.
+5. Backpropagate gradients.
+6. Update trainable weights.
+7. Periodically evaluate on validation examples.
+8. Save checkpoints.
+
+<GlossaryTerm term="Batch">a group of examples processed together.</GlossaryTerm> <GlossaryTerm term="Gradient">a signal that points in the direction of weight changes that reduce loss.</GlossaryTerm> <GlossaryTerm term="Learning rate">the step size used when updating weights.</GlossaryTerm> <GlossaryTerm term="Epoch">one pass through the training split.</GlossaryTerm>
+
+The training loop creates traces engineers inspect:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Signal</th>
+        <th>Healthy pattern</th>
+        <th>Warning sign</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Training loss</td>
+        <td>Usually decreases over time.</td>
+        <td>Flat or exploding loss may mean bad learning rate, formatting bug, or impossible labels.</td>
+      </tr>
+      <tr>
+        <td>Validation loss</td>
+        <td>Improves with training, then stabilizes.</td>
+        <td>Training loss falls while validation gets worse, suggesting overfitting.</td>
+      </tr>
+      <tr>
+        <td>Task metrics</td>
+        <td>Improve on held-out examples.</td>
+        <td>Loss improves but user-visible behavior does not.</td>
+      </tr>
+      <tr>
+        <td>Regression evals</td>
+        <td>Important old behaviors remain acceptable.</td>
+        <td>New model improves one skill but breaks refusals, tool calls, or general helpfulness.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The most beginner-friendly mistake is training before defining evaluation. Without a baseline and test set, a lower loss can feel like progress even when the product got worse.
+
+<CheckUnderstanding prompt="What does it mean if training loss improves but validation quality gets worse?">
+The model may be overfitting: it is learning patterns specific to the training examples rather than behavior that generalizes to new examples.
+</CheckUnderstanding>
+
+## Section 6: LoRA and QLoRA
+
+Full fine-tuning can require large amounts of memory because every model weight may need gradients and optimizer state. <GlossaryTerm term="Parameter-efficient fine-tuning">a family of methods that updates only a small number of trainable parameters while keeping most pretrained weights frozen.</GlossaryTerm>
+
+LoRA, short for Low-Rank Adaptation, is one of the most widely used PEFT methods. It freezes a pretrained weight matrix and learns a small low-rank update.
+
+<EquationBlock title="LoRA update" equation={"W' = W + Delta W, where Delta W = B A and rank(Delta W) <= r"}>
+`W` is the frozen pretrained weight matrix. `W'` is the adapted weight used during fine-tuned inference. `Delta W` is the learned change to the original matrix. `A` and `B` are smaller trainable matrices. `r` is the rank, a small number that limits the update's capacity. Because `A` and `B` are much smaller than `W`, training stores and updates fewer parameters.
+</EquationBlock>
+
+Plain example: suppose a full matrix has millions of numbers. LoRA does not learn a new full matrix. It learns two smaller matrices whose product acts like a focused correction. That correction can be loaded as an adapter or merged into the base model for inference depending on the serving setup.
+
+QLoRA goes one step further. It keeps the pretrained model in a quantized, low-bit representation and trains LoRA adapters through it. <GlossaryTerm term="Quantization">representing model weights with fewer bits than usual, often to reduce memory.</GlossaryTerm> The QLoRA paper showed that large models could be fine-tuned more efficiently by backpropagating through a frozen 4-bit quantized model into LoRA adapters.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Base weights</th>
+        <th>Trainable weights</th>
+        <th>Best beginner mental model</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Full fine-tuning</td>
+        <td>Updated.</td>
+        <td>Most or all model weights.</td>
+        <td>Rewrite the whole model slightly.</td>
+      </tr>
+      <tr>
+        <td>LoRA</td>
+        <td>Frozen.</td>
+        <td>Small adapter matrices.</td>
+        <td>Add a compact learned correction.</td>
+      </tr>
+      <tr>
+        <td>QLoRA</td>
+        <td>Frozen and quantized.</td>
+        <td>Small adapter matrices.</td>
+        <td>Add a compact correction while saving memory.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+LoRA and QLoRA are not magic quality guarantees. They are engineering tradeoffs. They make experimentation cheaper, but the same data and evaluation problems remain.
+
+<SourceCitation label="Hu et al., LoRA: Low-Rank Adaptation of Large Language Models" href="https://arxiv.org/abs/2106.09685" />
+<SourceCitation label="Dettmers et al., QLoRA: Efficient Finetuning of Quantized LLMs" href="https://arxiv.org/abs/2305.14314" />
+<SourceCitation label="Hugging Face PEFT documentation" href="https://huggingface.co/docs/peft/index" />
+
+## Section 7: Preference tuning
+
+Sometimes it is hard to write the single perfect answer, but easier to say which of two answers is better. That is the idea behind preference data.
+
+A preference example might contain:
+
+```json
+{
+  "prompt": "Explain a billing overage to a frustrated customer.",
+  "chosen": "I can help. The overage came from 18 extra seats active from May 3 to May 21. Here is the line-item calculation...",
+  "rejected": "You used extra seats, so the charge is valid."
+}
+```
+
+The chosen answer is more useful because it is specific, respectful, and explanatory. The rejected answer may be factually related but poor for the target behavior.
+
+Reinforcement learning from human feedback, usually shortened to RLHF, is one influential route. In InstructGPT, the workflow included supervised demonstrations, a reward model trained from comparisons, and reinforcement learning to optimize the policy against that reward model.
+
+Direct Preference Optimization, or DPO, is a later method that directly optimizes a language model from preference pairs without fitting a separate reward model in the same way. The DPO paper frames the language model itself as implicitly representing a reward model under a particular objective.
+
+<EquationBlock title="Preference tuning intuition" equation={"make chosen output more likely than rejected output for the same prompt"}>
+Preference optimization does not require every output to have a single gold answer. It teaches relative preference: for this prompt, output A should be preferred over output B.
+</EquationBlock>
+
+Use preference tuning when the quality dimension is comparative: helpfulness, refusal quality, tone, brevity, reasoning style, or ranking between acceptable and less acceptable answers. Use supervised fine-tuning when you have clear target outputs to imitate.
+
+<SourceCitation label="Rafailov et al., Direct Preference Optimization" href="https://arxiv.org/abs/2305.18290" />
+
+## Section 8: Evaluation before release
+
+A fine-tuned model should be evaluated against the system it replaces. The comparison should include a prompt-only baseline and, when relevant, a RAG baseline. If the fine-tuned model is not clearly better on the target behavior, do not ship extra complexity.
+
+Use several evaluation layers:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Layer</th>
+        <th>Measures</th>
+        <th>Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Task correctness</td>
+        <td>Does the answer solve the requested task?</td>
+        <td>Correct classification, extraction, summary, or tool choice.</td>
+      </tr>
+      <tr>
+        <td>Format reliability</td>
+        <td>Does output satisfy the expected schema?</td>
+        <td>Valid JSON, required fields, no extra prose.</td>
+      </tr>
+      <tr>
+        <td>Style and policy</td>
+        <td>Does it match the intended voice and safety rules?</td>
+        <td>Escalates refunds correctly and avoids unsupported promises.</td>
+      </tr>
+      <tr>
+        <td>Regression set</td>
+        <td>Did important existing behaviors survive?</td>
+        <td>Still refuses unsafe requests and still cites retrieved evidence.</td>
+      </tr>
+      <tr>
+        <td>Operational metrics</td>
+        <td>Did cost, latency, and failure handling improve?</td>
+        <td>Shorter prompts may reduce tokens, but adapter serving may add complexity.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+A minimal release gate:
+
+1. Baseline results are recorded.
+2. Train, validation, and test splits are deduplicated.
+3. The fine-tuned model beats the baseline on target examples.
+4. Regression tests remain within acceptable limits.
+5. Privacy and safety review passes.
+6. Monitoring can compare live behavior with the previous model.
+7. Rollback is possible.
+
+<EquationBlock title="Regression-aware score" equation={"ship_score = target_gain - regression_penalty - cost_penalty"}>
+`target_gain` is improvement on the desired behavior. `regression_penalty` is quality lost on important old behaviors. `cost_penalty` is added cost, latency, maintenance, or operational complexity. A model that improves one narrow metric but creates large regressions should not ship.
+</EquationBlock>
+
+<Quiz
+  question="What should a fine-tuned model be compared against?"
+  options={[
+    "A prompt-only or previous-production baseline, plus RAG or tool-use baselines when relevant.",
+    "Only the training loss curve.",
+    "Only a few examples that were used during training.",
+  ]}
+  correctIndex={0}
+  explanation="Fine-tuning earns its keep by beating realistic alternatives on held-out evaluations and not creating unacceptable regressions."
+/>
+
+## Section 9: Common production failure modes
+
+Fine-tuning adds a new release surface. The model can fail in ways that look like ordinary LLM failure, but the cause may be training data or adaptation.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Failure mode</th>
+        <th>What it looks like</th>
+        <th>What to check</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Overfitting</td>
+        <td>Great training metrics, weak new examples.</td>
+        <td>Validation curves, test performance, duplicate leakage, example diversity.</td>
+      </tr>
+      <tr>
+        <td>Memorization</td>
+        <td>Model reproduces sensitive or exact training text.</td>
+        <td>Privacy filters, redaction, memorization tests, training data permissions.</td>
+      </tr>
+      <tr>
+        <td>Catastrophic forgetting</td>
+        <td>Model improves one behavior but loses general capability.</td>
+        <td>Regression evals across old tasks, mixed training data, lower learning rate, adapters.</td>
+      </tr>
+      <tr>
+        <td>Style overfitting</td>
+        <td>Model repeats the same phrase or tone everywhere.</td>
+        <td>Example diversity and style-specific eval slices.</td>
+      </tr>
+      <tr>
+        <td>Benchmark leakage</td>
+        <td>Suspiciously high results on evaluation examples.</td>
+        <td>Exact and fuzzy duplicate checks across train, validation, test, and prompts.</td>
+      </tr>
+      <tr>
+        <td>Safety drift</td>
+        <td>Fine-tuned model becomes too permissive or too refusing.</td>
+        <td>Safety evals, refusal examples, policy examples, human review.</td>
+      </tr>
+      <tr>
+        <td>Weak baseline</td>
+        <td>Fine-tuning seems useful because the prompt was bad.</td>
+        <td>Improve prompting, schemas, retrieval, and tool descriptions before training.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The debugging question is not "did fine-tuning work?" It is:
+
+<EquationBlock title="Debugging question" equation={"bad_output = data_issue or objective_issue or eval_issue or serving_issue"}>
+`data_issue` means bad, inconsistent, leaky, or unrepresentative examples. `objective_issue` means the training method does not match the desired behavior. `eval_issue` means the tests do not measure what users need. `serving_issue` means the deployed model, adapter, prompt, retrieval, or parameters differ from the tested setup.
+</EquationBlock>
+
+## Section 10: A small implementation sketch
+
+This sketch uses Hugging Face libraries to show the shape of a supervised LoRA fine-tuning job. It is intentionally small and conceptual. Real training needs hardware planning, dependency pinning, data review, logging, checkpointing, and stronger evaluation.
+
+```python
+from datasets import load_dataset
+from peft import LoraConfig
+from trl import SFTConfig, SFTTrainer
+
+dataset = load_dataset("json", data_files={
+    "train": "train.jsonl",
+    "validation": "validation.jsonl",
+})
+
+peft_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+    task_type="CAUSAL_LM",
+)
+
+training_args = SFTConfig(
+    output_dir="fine-tuned-support-assistant",
+    max_seq_length=2048,
+    num_train_epochs=2,
+    learning_rate=2e-4,
+    eval_strategy="steps",
+    eval_steps=100,
+)
+
+trainer = SFTTrainer(
+    model="your-base-model",
+    args=training_args,
+    train_dataset=dataset["train"],
+    eval_dataset=dataset["validation"],
+    peft_config=peft_config,
+)
+
+trainer.train()
+```
+
+Important beginner notes:
+
+- `train.jsonl` and `validation.jsonl` should not contain the same or near-duplicate examples.
+- `target_modules` are architecture-specific; check the model documentation.
+- `max_seq_length` must fit your examples and hardware.
+- Training success is not the same as product success. Run held-out task and regression evaluations before deployment.
+
+## GitHub projects to build from
+
+Use these repositories as the practical bridge from this lesson to real implementation. Do not treat any one repository as the only correct way to fine-tune. Read the examples, run the smallest reproducible path, then compare what changed in data format, training configuration, evaluation, checkpointing, and serving.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Project</th>
+        <th>What to build from it</th>
+        <th>Professional caution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Hugging Face TRL</td>
+        <td>Start with the `SFTTrainer` examples to turn a base model into an instruction-following model, then inspect how datasets, chat templates, training arguments, and evaluation hooks are wired.</td>
+        <td>Trainer code is only the training loop. You still need clean splits, privacy review, baseline comparisons, and regression evaluations.</td>
+      </tr>
+      <tr>
+        <td>Hugging Face PEFT</td>
+        <td>Use the LoRA and quantization examples to learn how adapter configuration, target modules, saving, loading, and merging differ from full fine-tuning.</td>
+        <td>`target_modules`, quantization settings, and memory behavior depend on the model architecture and hardware.</td>
+      </tr>
+      <tr>
+        <td>Axolotl</td>
+        <td>Clone the example configurations and run a small LoRA or QLoRA job from YAML so you can see the full workflow: base model, dataset type, validation split, training, and adapter output.</td>
+        <td>Configuration-driven training is powerful, but beginners should read every field instead of copying a large model config blindly.</td>
+      </tr>
+      <tr>
+        <td>LLaMA Factory</td>
+        <td>Use its command-line interface or Web UI to practice data preparation, supervised fine-tuning, preference tuning, evaluation, and OpenAI-style serving for open models.</td>
+        <td>Its breadth is useful after you understand the basics; start with one small supervised fine-tuning run before exploring every feature.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div className="source-list">
+  <SourceCitation label="Hugging Face TRL GitHub repository" href="https://github.com/huggingface/trl" />
+  <SourceCitation label="Hugging Face PEFT GitHub repository" href="https://github.com/huggingface/peft" />
+  <SourceCitation label="Axolotl GitHub repository" href="https://github.com/axolotl-ai-cloud/axolotl" />
+  <SourceCitation label="LLaMA Factory GitHub repository" href="https://github.com/hiyouga/LLaMA-Factory" />
+</div>
+
+## Common misconceptions
+
+Fine-tuning is not the same as giving the model a database. Use retrieval when the answer depends on current or inspectable sources.
+
+Fine-tuning is not guaranteed to improve reasoning. It can teach output patterns, formats, preferences, and domain behavior, but weak or narrow data can make reasoning worse.
+
+More examples are not always better. Ten thousand inconsistent examples can be worse than five hundred carefully reviewed examples.
+
+A lower training loss is not a product metric. Product quality depends on held-out task success, safety, regressions, cost, and user impact.
+
+LoRA is not a worse version of full fine-tuning by default. It is a tradeoff: cheaper, smaller, and often strong enough, but not always expressive enough for every adaptation goal.
+
+## Practice checks
+
+1. You have a support assistant that uses the wrong refund policy because policies change weekly. Should you fine-tune or use RAG first?
+
+Answer: Use RAG first. The issue is changing knowledge. Fine-tuning might later help with answer style or escalation behavior, but it should not be the source of current policy facts.
+
+2. You need every answer to be short, empathetic, and use a stable support format. Prompting works on easy cases but fails on many real tickets. What evidence do you need before fine-tuning?
+
+Answer: You need high-quality examples of the target behavior, a prompt-only baseline, train/validation/test splits, regression tests, privacy review, and metrics showing fine-tuning beats simpler approaches.
+
+3. Training loss decreases, but test examples get worse. What is the likely diagnosis?
+
+Answer: Overfitting, leakage in development decisions, poor split design, or training data that does not represent test behavior. Inspect duplicates, validation curves, data quality, and hyperparameters.
+
+4. A LoRA adapter improves JSON formatting but makes safety refusals weaker. What should you do?
+
+Answer: Do not ship as-is. Add safety regression evals, inspect training examples for missing refusal cases, adjust data or objective, and compare against validation and test sets before another release attempt.
+
+## Additional implementation resources
+
+- OpenAI supervised fine-tuning guide: provider-specific data formats, model support, and workflow concepts.
+- OpenAI fine-tuning platform update: current availability limits for OpenAI-managed fine-tuning access.
+- OpenAI fine-tuning API reference: endpoint and job concepts for accounts that still have OpenAI-supported fine-tuning access.
+- Hugging Face PEFT: adapter methods including LoRA and related parameter-efficient techniques.
+- Hugging Face TRL SFTTrainer: supervised fine-tuning trainer for Transformer language models.
+- Hugging Face TRL GitHub repository: runnable supervised fine-tuning, preference tuning, and reinforcement learning examples.
+- Hugging Face PEFT GitHub repository: adapter and quantization examples for parameter-efficient fine-tuning.
+- Axolotl GitHub repository: configuration-driven LoRA, QLoRA, full fine-tuning, preprocessing, testing, and adapter merging workflows.
+- LLaMA Factory GitHub repository: CLI and Web UI workflows for supervised fine-tuning, preference tuning, evaluation, and OpenAI-style serving.
+- LoRA paper repository and implementations: useful for understanding adapter configuration and serving tradeoffs.
+- QLoRA paper and code: useful for memory-efficient open-model fine-tuning.
+
+## Final mental model
+
+Fine-tuning is model adaptation through training examples. It is powerful when the target behavior is stable, repeated, and measurable. It is the wrong tool when the problem is changing knowledge, weak retrieval, missing validation, or unclear product requirements.
+
+Before fine-tuning, ask:
+
+1. Can a better prompt, schema, tool, or RAG pipeline solve this?
+2. Do we have examples good enough to teach the behavior?
+3. Do we have held-out evaluations good enough to detect regressions?
+4. Can we explain what will change, what might break, and how we will roll back?
+
+If the answer to those questions is yes, fine-tuning becomes an engineering tool instead of a hopeful experiment.

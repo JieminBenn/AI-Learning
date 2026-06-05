@@ -10,6 +10,8 @@ type ConceptDiagramProps = {
     | "positional"
     | "rag"
     | "dataPipeline"
+    | "fineTuning"
+    | "aiSystem"
     | "agent";
 };
 
@@ -258,6 +260,36 @@ export function ConceptDiagram({ type }: ConceptDiagramProps) {
           <div className="diagram-node accent">Validate and version</div>
           <div className="diagram-node">Transform for AI use</div>
           <div className="diagram-node output">Retrieve, train, evaluate, monitor</div>
+        </div>
+      </figure>
+    );
+  }
+
+  if (type === "fineTuning") {
+    return (
+      <figure className="concept-diagram fine-tuning-diagram">
+        <figcaption>Fine-tuning workflow</figcaption>
+        <div className="diagram-grid compact">
+          <div className="diagram-node input">Base model</div>
+          <div className="diagram-node">Curated examples</div>
+          <div className="diagram-node accent">Training updates</div>
+          <div className="diagram-node">Validation checks</div>
+          <div className="diagram-node output">Adapted model</div>
+        </div>
+      </figure>
+    );
+  }
+
+  if (type === "aiSystem") {
+    return (
+      <figure className="concept-diagram ai-system-diagram">
+        <figcaption>Production AI system loop</figcaption>
+        <div className="diagram-grid compact">
+          <div className="diagram-node input">User request</div>
+          <div className="diagram-node">Gateway and policy checks</div>
+          <div className="diagram-node accent">Retrieve, call tools, or generate</div>
+          <div className="diagram-node">Trace, score, and monitor</div>
+          <div className="diagram-node output">Answer, fallback, or incident</div>
         </div>
       </figure>
     );

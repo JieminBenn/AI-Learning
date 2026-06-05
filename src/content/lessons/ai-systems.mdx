@@ -1,0 +1,724 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson teaches AI systems: the production software around models. A model call is only one part of a real AI feature. Professional systems also need data, prompts, retrieval, tools, policy checks, latency controls, observability, evaluations, cost limits, fallback behavior, and incident response.
+
+The goal is not to memorize one cloud stack. The goal is to understand the system shape well enough to ask the right engineering questions before users depend on it.
+
+We will move from intuition to professional operation:
+
+1. Why a model is not the whole product.
+2. What happens on the request path.
+3. How serving, latency, throughput, batching, streaming, and caching interact.
+4. How traces, metrics, and logs make AI behavior inspectable.
+5. How evaluation gates reduce release risk.
+6. How cost models shape architecture.
+7. How reliability, privacy, safety, and rollback planning fit together.
+8. What breaks in production and how engineers diagnose it.
+
+## Explain it in 5 minutes
+
+An AI system is software that uses one or more models to deliver a user-facing or business-facing behavior. The model might write an answer, classify a document, call a tool, retrieve evidence, generate code, or summarize a support ticket. But the system is everything required to make that behavior reliable enough to ship.
+
+Imagine a support assistant. The visible answer may come from a large language model, but the complete path is longer:
+
+1. Check the user's identity and permissions.
+2. Load the right prompt, model version, and policy rules.
+3. Retrieve documents or call tools if the answer needs outside facts.
+4. Send a request to a model provider or self-hosted model.
+5. Validate the answer, attach citations, and apply safety or format checks.
+6. Return the answer, or use a fallback when confidence is low.
+7. Record traces, latency, token usage, costs, errors, and evaluation signals.
+
+<ConceptDiagram type="aiSystem" />
+
+The professional lesson is simple and uncomfortable: a brilliant model can still produce a bad product if the system around it is slow, unaudited, expensive, stale, insecure, or impossible to debug.
+
+<CheckUnderstanding prompt="What is the difference between a model and an AI system?">
+A model is the learned component that performs inference. An AI system includes the model plus orchestration, data, prompts, tools, serving, validation, observability, evaluation, cost controls, and operational processes.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define AI system, inference, serving, orchestration, latency, throughput, streaming, batching, cache, fallback, trace, span, metric, log, service-level indicator, service-level objective, error budget, evaluation gate, cost model, and incident response.
+- Trace a production AI request from user input to response, monitoring, and evaluation.
+- Explain why model quality and system reliability are separate but connected.
+- Read basic latency, throughput, cache hit rate, and cost equations.
+- Decide when to use streaming, caching, batching, smaller models, fallback models, human review, or asynchronous jobs.
+- Design a small observability and release plan for an AI feature.
+- Diagnose common production failures such as slow responses, rising cost, missing traces, stale prompts, retrieval outages, and evaluation regressions.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- A <GlossaryTerm term="model">a learned program that maps inputs to outputs.</GlossaryTerm> In this curriculum, the model is often a large language model.
+- <GlossaryTerm term="Inference">running a trained model to produce an output.</GlossaryTerm> Training changes model weights; inference uses existing weights.
+- An <GlossaryTerm term="application programming interface">a structured way for one program to call another program.</GlossaryTerm> This is usually shortened to API.
+- <GlossaryTerm term="Retrieval">searching external data for relevant evidence.</GlossaryTerm>
+- A <GlossaryTerm term="tool call">a model-requested action that application code validates and executes.</GlossaryTerm>
+- An <GlossaryTerm term="evaluation">a repeatable check that measures whether the AI workflow behaves well enough for a target task.</GlossaryTerm>
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Serving</td>
+        <td>Making a model available to software.</td>
+        <td>The runtime path that receives requests, runs inference, and returns outputs under latency, reliability, and cost constraints.</td>
+      </tr>
+      <tr>
+        <td>Latency</td>
+        <td>How long one request takes.</td>
+        <td>Usually measured at percentiles such as p50, p95, and p99 because tail latency affects real users.</td>
+      </tr>
+      <tr>
+        <td>Throughput</td>
+        <td>How much work the system handles.</td>
+        <td>Requests, tokens, documents, or jobs processed per unit of time.</td>
+      </tr>
+      <tr>
+        <td>Cache</td>
+        <td>A place to reuse previous work.</td>
+        <td>Can reduce latency and cost for repeated prompts, retrieval results, tool responses, or model outputs when reuse is safe.</td>
+      </tr>
+      <tr>
+        <td>Trace</td>
+        <td>A timeline of what happened.</td>
+        <td>A structured record of one request across model calls, retrieval, tools, validation, and response generation.</td>
+      </tr>
+      <tr>
+        <td>Span</td>
+        <td>One timed step inside a trace.</td>
+        <td>Examples include `retrieve_documents`, `call_model`, `validate_json`, and `rerank_results`.</td>
+      </tr>
+      <tr>
+        <td>Service-level indicator</td>
+        <td>A number that measures service behavior.</td>
+        <td>Often shortened to SLI; examples include success rate, p95 latency, grounded-answer rate, and valid-tool-call rate.</td>
+      </tr>
+      <tr>
+        <td>Service-level objective</td>
+        <td>A target for an indicator.</td>
+        <td>Often shortened to SLO; for example, 99% of requests should succeed or p95 latency should stay below 4 seconds.</td>
+      </tr>
+      <tr>
+        <td>Error budget</td>
+        <td>How much unreliability is allowed.</td>
+        <td>The gap between perfect reliability and the service-level objective; it helps teams balance shipping speed against stability.</td>
+      </tr>
+      <tr>
+        <td>Evaluation gate</td>
+        <td>A test before release.</td>
+        <td>A required comparison that blocks model, prompt, retrieval, tool, or data changes when quality regresses.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: Why a model is not enough
+
+A prototype can be one prompt in a notebook. A production AI feature is different because users bring messy inputs, traffic arrives unevenly, dependencies fail, data changes, costs accumulate, and releases can regress behavior.
+
+There are four layers to keep separate:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Layer</th>
+        <th>What it contains</th>
+        <th>Typical failure</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Model layer</td>
+        <td>Model choice, inference settings, context length, decoding, model version.</td>
+        <td>The answer is fluent but wrong, unsafe, too long, or too expensive.</td>
+      </tr>
+      <tr>
+        <td>Data layer</td>
+        <td>Documents, indexes, datasets, labels, logs, metadata, permissions.</td>
+        <td>The model receives stale, missing, duplicated, or unauthorized information.</td>
+      </tr>
+      <tr>
+        <td>Application layer</td>
+        <td>Prompts, retrieval, tools, validation, policies, user interface, fallbacks.</td>
+        <td>The workflow calls the wrong tool, drops citations, loops, or returns invalid JSON.</td>
+      </tr>
+      <tr>
+        <td>Operations layer</td>
+        <td>Deployment, monitoring, tracing, alerts, rate limits, cost controls, incident response.</td>
+        <td>No one can tell why quality dropped, latency rose, or spending spiked.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The OpenAI production best practices guide emphasizes production planning across access control, model choice, latency, cost, safety, and operational robustness. OpenTelemetry's generative AI conventions and MLflow's tracing documentation show the same professional direction from the observability side: AI workflows need structured instrumentation, not just final answers in logs.
+
+<div className="source-list">
+  <SourceCitation label="OpenAI production best practices" href="https://platform.openai.com/docs/guides/production-best-practices" />
+  <SourceCitation label="OpenTelemetry GenAI semantic conventions" href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />
+  <SourceCitation label="MLflow GenAI tracing documentation" href="https://mlflow.org/docs/latest/genai/tracing/" />
+</div>
+
+## Section 2: The request path
+
+A <GlossaryTerm term="request path">the sequence of steps that happen after a user or service asks the AI system to do work.</GlossaryTerm> For a chat assistant, the request path might include a model call. For a document-processing workflow, it might include file parsing, extraction, classification, and asynchronous review.
+
+Here is a common synchronous request path:
+
+1. Receive user input.
+2. Authenticate the user.
+3. Authorize access to documents, tools, or accounts.
+4. Normalize and validate the input.
+5. Load the prompt, model, tool, retrieval, and policy versions.
+6. Retrieve evidence or call tools when needed.
+7. Assemble the model request.
+8. Run inference.
+9. Validate the output.
+10. Return an answer, fallback, or escalation.
+11. Record traces, metrics, logs, costs, and feedback hooks.
+
+<EquationBlock title="AI request in one line" equation={"response = policy(validate(model(orchestrate(input, data, tools))))"}>
+`input` is the user or service request. `orchestrate` prepares retrieval, tools, prompts, and context. `model` runs inference. `validate` checks structure, grounding, safety, and business rules. `policy` decides whether to return, refuse, retry, fallback, or escalate.
+</EquationBlock>
+
+This equation is not a formal theorem. It is a mental model for the engineering boundary: the model does not own the whole workflow. Application code owns permissions, validation, fallback behavior, logging, and release control.
+
+<Quiz
+  question="Which part should enforce whether a user may access a private document?"
+  options={[
+    "Application-side authorization before retrieval or tool execution.",
+    "A sentence in the prompt asking the model to be careful.",
+    "The model's general world knowledge.",
+  ]}
+  correctIndex={0}
+  explanation="Authorization is a system responsibility. Prompts can guide behavior, but access control should be enforced in deterministic application code."
+/>
+
+## Section 3: Latency and throughput
+
+<GlossaryTerm term="Latency">the time between starting a request and receiving the result.</GlossaryTerm> Users feel latency directly. A support assistant that answers in 1.5 seconds feels different from one that answers in 18 seconds.
+
+<GlossaryTerm term="Throughput">the amount of work completed per unit of time.</GlossaryTerm> A system with high throughput can serve more requests, tokens, or jobs in the same time window.
+
+<EquationBlock title="End-to-end latency" equation={"T_total = T_queue + T_retrieve + T_tools + T_model + T_validate + T_network"}>
+`T_total` is total request time. `T_queue` is time waiting before work starts. `T_retrieve` is search time. `T_tools` is tool execution time. `T_model` is model inference time. `T_validate` is output checking time. `T_network` is time spent moving data across services.
+</EquationBlock>
+
+Beginners often look only at model latency. Professionals break the request into stages because the slowest stage might be retrieval, a database, a tool, a queue, a long prompt, or network distance.
+
+Latency is usually reported with percentiles:
+
+- `p50` means half of requests are faster than this value.
+- `p95` means 95% of requests are faster than this value.
+- `p99` means 99% of requests are faster than this value.
+
+Tail latency matters because the worst few percent of requests may be the ones users remember. Google SRE material treats monitoring as a way to collect and display real-time quantitative system behavior, which is exactly the habit AI systems need when model calls become production dependencies.
+
+<SourceCitation label="Google SRE Book: Monitoring Distributed Systems" href="https://sre.google/sre-book/monitoring-distributed-systems/" />
+
+<CheckUnderstanding prompt="Why should an AI team measure p95 latency instead of only average latency?">
+Average latency can hide slow tail requests. p95 shows the experience of a much worse but still common request, which is often closer to what users complain about.
+</CheckUnderstanding>
+
+## Section 4: Serving choices
+
+Serving means making inference available to your application. There are two common patterns.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Serving pattern</th>
+        <th>Plain-language idea</th>
+        <th>Good fit</th>
+        <th>Main tradeoff</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Managed model API</td>
+        <td>Call a provider-hosted model over an API.</td>
+        <td>Fast product development, strong models, less infrastructure ownership.</td>
+        <td>Provider limits, per-token pricing, network dependency, less low-level control.</td>
+      </tr>
+      <tr>
+        <td>Self-hosted model</td>
+        <td>Run model servers on your own cloud or hardware.</td>
+        <td>Special deployment constraints, custom models, tight data or latency requirements.</td>
+        <td>More operational work: GPUs, scaling, batching, memory, upgrades, and incident response.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Serving also includes response mode:
+
+- Synchronous serving: the user waits for the result now.
+- Asynchronous jobs: the system accepts work, queues it, and returns later.
+- Streaming: the system sends partial output as it is generated.
+
+Streaming does not always reduce total work. It improves perceived latency because the user sees progress earlier. It is especially useful for long generated text.
+
+Batching groups multiple requests together so hardware is used more efficiently. It can improve throughput and cost, but it can also add queue delay. For user-facing chat, too much batching can make the product feel sluggish. For offline document processing, batching is often worth it.
+
+## Section 5: Caching
+
+A <GlossaryTerm term="cache">a storage layer that reuses previous results instead of recomputing them.</GlossaryTerm> AI systems can cache several kinds of work:
+
+- Retrieved document results for repeated queries.
+- Tool results that are stable for a short time.
+- Model outputs for identical safe requests.
+- Embeddings for repeated documents or queries.
+- Prompt prefixes when the serving stack supports prefix reuse.
+
+<EquationBlock title="Cache hit rate" equation={"hit_rate = cache_hits / total_requests"}>
+`cache_hits` is the number of requests served from cache. `total_requests` is the number of requests that checked the cache. A higher hit rate can reduce cost and latency when cached results are safe to reuse.
+</EquationBlock>
+
+Caching requires judgment. Do not cache private user data into a shared cache. Do not reuse answers when permissions, time-sensitive facts, account state, or policy version changed. A cache key should include the inputs that affect correctness: user or tenant scope, prompt version, model version, tool version, retrieval index version, and relevant policy version.
+
+<Quiz
+  question="Which result is usually safest to cache?"
+  options={[
+    "The embedding for a public documentation page at a known version.",
+    "A user's private account balance answer shared across all users.",
+    "A legal answer based on a policy that changed this morning without versioning.",
+  ]}
+  correctIndex={0}
+  explanation="Versioned public document embeddings are usually safe to reuse. Private, permission-sensitive, or rapidly changing answers require much stricter cache keys or no caching."
+/>
+
+## Section 6: Observability for AI
+
+<GlossaryTerm term="Observability">the ability to understand system behavior from emitted data.</GlossaryTerm> For AI systems, observability needs ordinary service data and AI-specific data.
+
+The three classic signals are:
+
+- Metrics: numeric measurements such as request count, error rate, latency, cost, and token usage.
+- Logs: event records such as validation failures, policy decisions, and deployment changes.
+- Traces: timelines showing how one request moved through services and steps.
+
+AI-specific observability adds:
+
+- Model name and version.
+- Prompt or instruction version.
+- Retrieval index version.
+- Tool names, arguments, validation results, and observations.
+- Input and output token counts.
+- Safety filter outcomes.
+- Grounding or citation checks.
+- Evaluation labels or human review decisions.
+
+OpenTelemetry's generative AI semantic conventions define common names for describing generative AI operations in telemetry. MLflow's GenAI tracing documentation shows how traces can capture model calls, prompts, tool interactions, latency, and token usage. The practical point is not that every team must use one tool. The point is that AI workflows need inspectable records across the whole chain.
+
+<SourceCitation label="OpenTelemetry semantic conventions for generative AI systems" href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />
+
+<EquationBlock title="Error rate" equation={"error_rate = failed_requests / total_requests"}>
+`failed_requests` is the count of requests that failed according to your definition. `total_requests` is all measured requests. For AI, failure may include HTTP errors, invalid JSON, missing citations, unsafe content, wrong tool calls, or unsupported claims.
+</EquationBlock>
+
+Be careful with privacy. Observability should help debug the system without casually storing sensitive prompts, private documents, secrets, or personal data. Many teams store hashes, IDs, redacted text, sampled traces, or access-controlled trace payloads.
+
+## Section 7: Evaluation gates
+
+An <GlossaryTerm term="evaluation gate">a release check that compares a proposed change against expected behavior before production.</GlossaryTerm> AI systems need evaluation gates because small changes can cause surprising regressions. A prompt edit can reduce citation quality. A model upgrade can improve style but harm tool calls. A retrieval index change can silently drop important pages.
+
+Evaluation gates should run before changes to:
+
+- Model version.
+- Prompt version.
+- Retrieval index.
+- Chunking strategy.
+- Tool schema.
+- Safety policy.
+- Fine-tuned model or adapter.
+- Data parser.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Evaluation type</th>
+        <th>What it checks</th>
+        <th>Example metric</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Task evaluation</td>
+        <td>Does the workflow solve the target task?</td>
+        <td>Exact match, rubric score, or human preference.</td>
+      </tr>
+      <tr>
+        <td>Retrieval evaluation</td>
+        <td>Does the system find the needed evidence?</td>
+        <td>Recall at k or mean reciprocal rank.</td>
+      </tr>
+      <tr>
+        <td>Grounding evaluation</td>
+        <td>Are generated claims supported by sources?</td>
+        <td>Faithfulness score or unsupported-claim rate.</td>
+      </tr>
+      <tr>
+        <td>Tool evaluation</td>
+        <td>Does the model choose tools and arguments correctly?</td>
+        <td>Valid call rate and correct tool rate.</td>
+      </tr>
+      <tr>
+        <td>Safety evaluation</td>
+        <td>Does the system avoid forbidden or risky behavior?</td>
+        <td>Policy pass rate by risk category.</td>
+      </tr>
+      <tr>
+        <td>Operational evaluation</td>
+        <td>Can the system meet latency, reliability, and cost targets?</td>
+        <td>p95 latency, error rate, and cost per successful task.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Anthropic's evaluation tooling documentation is a useful example of treating evaluations as structured datasets and repeatable experiments. The broader professional habit is provider-independent: freeze meaningful cases, compare versions, inspect failures, and block risky releases.
+
+<SourceCitation label="Anthropic evaluation tool documentation" href="https://platform.claude.com/docs/en/test-and-evaluate/eval-tool" />
+
+## Section 8: Cost model
+
+AI system cost is not just "the model is expensive." Cost can come from input tokens, output tokens, embedding jobs, reranking, vector database storage, tool calls, GPUs, queues, logs, human review, and failed retries.
+
+<EquationBlock title="Cost per request" equation={"C_request = C_input_tokens + C_output_tokens + C_retrieval + C_tools + C_infra + C_review"}>
+`C_request` is total cost for one request. `C_input_tokens` and `C_output_tokens` are model-token costs. `C_retrieval` is search and indexing cost allocated to the request. `C_tools` is external service cost. `C_infra` is hosting and observability cost. `C_review` is human review cost when needed.
+</EquationBlock>
+
+Cost controls should be architectural, not just dashboard-based:
+
+- Use smaller models when the task allows.
+- Shorten prompts without removing needed evidence.
+- Retrieve fewer but better chunks.
+- Cache stable work safely.
+- Stop generation when enough output has been produced.
+- Use asynchronous processing for expensive background tasks.
+- Add rate limits and quotas.
+- Monitor cost per successful task, not only cost per request.
+
+<CheckUnderstanding prompt="Why is cost per successful task better than cost per request?">
+A cheap request that fails and needs retries, escalation, or manual cleanup may be more expensive than a slightly costlier request that solves the task correctly.
+</CheckUnderstanding>
+
+## Section 9: Reliability and service objectives
+
+Reliability means the system keeps delivering acceptable behavior under real conditions. For AI systems, acceptable behavior includes ordinary availability and AI-specific quality.
+
+An <GlossaryTerm term="SLI">service-level indicator, a measurement of service behavior.</GlossaryTerm> An <GlossaryTerm term="SLO">service-level objective, a target for an SLI.</GlossaryTerm> Google SRE guidance uses service-level objectives to decide what reliability target a service should meet and how much unreliability is acceptable.
+
+<SourceCitation label="Google SRE Book: Service Level Objectives" href="https://sre.google/sre-book/service-level-objectives/" />
+
+AI systems can use both traditional and AI-specific service objectives:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Objective</th>
+        <th>Example target</th>
+        <th>Why it matters</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Availability</td>
+        <td>99.9% of requests receive a non-error response.</td>
+        <td>Users need the feature to be reachable.</td>
+      </tr>
+      <tr>
+        <td>Latency</td>
+        <td>p95 response time below 4 seconds.</td>
+        <td>Slow systems feel broken even when answers are correct.</td>
+      </tr>
+      <tr>
+        <td>Grounding</td>
+        <td>98% of cited support answers contain source-backed claims.</td>
+        <td>RAG systems should not invent policy.</td>
+      </tr>
+      <tr>
+        <td>Tool validity</td>
+        <td>99% of tool calls validate against schema and permissions.</td>
+        <td>Agents must not act on malformed or unauthorized requests.</td>
+      </tr>
+      <tr>
+        <td>Cost</td>
+        <td>Average cost per successful resolution below a target.</td>
+        <td>Unbounded usage can make a useful feature unsustainable.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Do not set objectives for everything at once. Choose a few measurements that match the user promise. A legal research assistant may prioritize grounding and auditability. A coding autocomplete system may prioritize latency. A background document classifier may prioritize throughput and accuracy.
+
+## Section 10: Fallbacks and graceful degradation
+
+<GlossaryTerm term="Fallback">an alternate behavior when the preferred path fails or becomes too risky.</GlossaryTerm> Fallbacks turn hard failures into controlled outcomes.
+
+Examples:
+
+- If retrieval fails, answer that the system cannot access sources instead of guessing.
+- If a tool times out, show a retry option or route to human support.
+- If a high-quality model is unavailable, use a smaller model for low-risk tasks.
+- If citations are missing, refuse to answer source-sensitive questions.
+- If confidence is low, ask a clarifying question or escalate.
+
+Fallbacks need product design. A fallback that silently gives lower-quality answers can be worse than an honest refusal. A fallback should tell the user what happened at the right level of detail and should record enough telemetry for engineers to investigate.
+
+<Quiz
+  question="A RAG assistant cannot retrieve any policy documents for a refund question. What is the best fallback?"
+  options={[
+    "Say it cannot answer from approved sources and offer escalation or retry.",
+    "Ask the model to answer from memory because it is probably close.",
+    "Hide the retrieval failure and return a confident answer without citations.",
+  ]}
+  correctIndex={0}
+  explanation="When evidence is required, missing retrieval should block unsupported answers. Escalation or retry is safer than pretending the system is grounded."
+/>
+
+## Section 11: Incident response
+
+An <GlossaryTerm term="incident">a production event where the system is failing or creating unacceptable risk.</GlossaryTerm> AI incidents can look familiar: downtime, latency spikes, database failures, bad deploys. They can also be AI-specific: sudden hallucination increase, unsafe outputs, wrong tool calls, broken retrieval, cost runaway, or prompt leakage.
+
+A basic AI incident response plan should answer:
+
+1. Who owns the incident?
+2. How do we detect it?
+3. How do we stop user harm quickly?
+4. What can we roll back?
+5. Which traces, prompts, model versions, tool versions, and data versions were involved?
+6. How do we communicate user impact?
+7. What evaluation or monitoring gap allowed the issue through?
+
+Common emergency controls include:
+
+- Disable a risky tool.
+- Roll back a prompt, model, adapter, index, or parser version.
+- Switch traffic to a safer fallback.
+- Lower rate limits.
+- Require human review for high-risk categories.
+- Temporarily refuse source-sensitive tasks.
+
+The key professional habit is versioning. If you cannot identify the model, prompt, retrieval index, tool schema, data parser, and policy version behind a bad output, rollback becomes guesswork.
+
+## Section 12: Common misconceptions
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Misconception</th>
+        <th>Correction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>"The model provider handles production."</td>
+        <td>A provider may handle model hosting, but your application still owns user permissions, data, prompts, tools, validation, evaluation, cost, and product behavior.</td>
+      </tr>
+      <tr>
+        <td>"Observability means saving every prompt and answer."</td>
+        <td>Observability means collecting useful, controlled signals. Sensitive payloads may need redaction, sampling, access control, or exclusion.</td>
+      </tr>
+      <tr>
+        <td>"If evals pass, monitoring is optional."</td>
+        <td>Evals measure known cases before release. Monitoring detects production behavior after release, including traffic shifts and dependency failures.</td>
+      </tr>
+      <tr>
+        <td>"Caching is always an easy win."</td>
+        <td>Caching can return stale or unauthorized results when keys ignore user scope, policy versions, model versions, or data freshness.</td>
+      </tr>
+      <tr>
+        <td>"A stronger model removes the need for system design."</td>
+        <td>Stronger models still need orchestration, evidence, guardrails, evaluation, and operational controls.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 13: Practice checks
+
+1. A customer-support assistant becomes slower after a prompt update. What should you inspect?
+
+   Compare trace spans before and after the update. Check input token count, retrieval time, tool calls, model latency, output length, retries, and validation failures.
+
+2. A model upgrade improves answer style but causes more unsupported claims. What should block the release?
+
+   A grounding or faithfulness evaluation gate should catch the regression. The release should not proceed until unsupported-claim rate returns to the acceptable target.
+
+3. Token spending doubles overnight, but traffic is flat. What changed?
+
+   Inspect prompt version, retrieved chunk count, output length, retry rate, model version, tool loops, cache hit rate, and any background jobs.
+
+4. Users report wrong answers, but dashboards show all systems healthy. What may be missing?
+
+   The dashboards may track only HTTP success and latency, not AI quality. Add task success, grounding, retrieval, tool validity, safety, and human feedback signals.
+
+5. A private document appears in a response for the wrong user. Which layer should you investigate first?
+
+   Investigate authorization and retrieval filters, cache keys, tenant scoping, trace payloads, and index metadata. Do not rely on the model to enforce access control.
+
+## A small implementation sketch
+
+This sketch shows the shape of one traced AI request. It is intentionally simple. Real systems need stronger authentication, redaction, retry policies, typed schemas, access-controlled trace storage, and production-grade monitoring.
+
+```ts
+type TraceSpan = {
+  name: string;
+  startMs: number;
+  endMs?: number;
+  attributes: Record<string, string | number | boolean>;
+};
+
+async function runSupportAssistant(question: string, userId: string) {
+  const traceId = crypto.randomUUID();
+  const spans: TraceSpan[] = [];
+
+  async function span<T>(
+    name: string,
+    attributes: TraceSpan["attributes"],
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const current: TraceSpan = { name, startMs: Date.now(), attributes };
+    spans.push(current);
+    try {
+      return await work();
+    } finally {
+      current.endMs = Date.now();
+    }
+  }
+
+  const permissions = await span("authorize", { userId }, () => loadUserPermissions(userId));
+  const evidence = await span("retrieve_documents", { indexVersion: "docs-2026-06-05" }, () =>
+    retrieveAllowedDocs(question, permissions),
+  );
+
+  if (evidence.length === 0) {
+    return {
+      traceId,
+      answer: "I cannot answer this from approved sources yet.",
+      spans,
+    };
+  }
+
+  const answer = await span("call_model", { model: "chosen-model", promptVersion: "support-v4" }, () =>
+    callModelWithEvidence(question, evidence),
+  );
+
+  const valid = await span("validate_grounding", { evidenceCount: evidence.length }, () =>
+    checkAnswerUsesSources(answer, evidence),
+  );
+
+  return {
+    traceId,
+    answer: valid ? answer : "I cannot verify this answer from the available sources.",
+    spans,
+  };
+}
+```
+
+The important pattern is not the exact code. The important pattern is that each stage has a name, versioned attributes, timing, and a controlled fallback.
+
+## Additional implementation resources
+
+- OpenAI production best practices: practical API production guidance for access, model choice, latency, costs, and production readiness.
+- OpenTelemetry GenAI semantic conventions: common telemetry vocabulary for generative AI operations.
+- MLflow GenAI tracing: examples for tracing model calls, prompts, tools, token usage, and latency.
+- Google SRE Book chapters on monitoring and service-level objectives: foundational reliability concepts that apply to AI services.
+- Anthropic evaluation tooling documentation: a concrete example of structured evaluation workflows.
+- OpenAI Cookbook: runnable examples for API application patterns, evaluations, prompt resilience, retrieval, and production-oriented workflows.
+- Promptfoo: a local CLI and library for prompt, model, agent, RAG, regression, and red-team evaluations that can run in continuous integration.
+- MLflow GitHub repository: implementation examples for tracing, evaluating, monitoring, and optimizing LLM and agent applications.
+- OpenTelemetry GenAI semantic conventions GitHub repository: the evolving source repository for GenAI spans, metrics, events, and reference implementation notes.
+
+## GitHub projects to build from
+
+Use these repositories to turn the systems ideas into working engineering habits. The goal is not to adopt all of them at once. Pick one workflow, make it observable, evaluate it, and only then add more infrastructure.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Project</th>
+        <th>What to build from it</th>
+        <th>Professional caution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>OpenAI Cookbook</td>
+        <td>Start with evaluation and prompt-resilience examples, then adapt them into a small release gate for your own assistant.</td>
+        <td>Cookbook examples teach patterns; production systems still need authentication, permission checks, redaction, quotas, and rollback plans.</td>
+      </tr>
+      <tr>
+        <td>Promptfoo</td>
+        <td>Create a version-controlled evaluation file for prompts, RAG answers, or agent behavior, then run it locally and in continuous integration before releases.</td>
+        <td>Automated graders can be wrong. Validate judge prompts, include deterministic checks where possible, and review failure cases manually.</td>
+      </tr>
+      <tr>
+        <td>MLflow</td>
+        <td>Build a traced model workflow and inspect spans, prompts, tool calls, token usage, outputs, and evaluation results in one place.</td>
+        <td>Tracing payloads can contain sensitive data. Design redaction, sampling, and access control before logging real user traffic.</td>
+      </tr>
+      <tr>
+        <td>OpenTelemetry GenAI semantic conventions</td>
+        <td>Use the GenAI span and metric names as a vocabulary for instrumenting model calls, tool calls, token counts, and provider attributes.</td>
+        <td>Semantic conventions evolve. Version your telemetry assumptions and avoid building dashboards that depend on unreviewed payload fields.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div className="source-list">
+  <SourceCitation label="OpenAI production best practices" href="https://platform.openai.com/docs/guides/production-best-practices" />
+  <SourceCitation label="OpenTelemetry GenAI semantic conventions" href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" />
+  <SourceCitation label="MLflow GenAI tracing documentation" href="https://mlflow.org/docs/latest/genai/tracing/" />
+  <SourceCitation label="Google SRE Book: Monitoring Distributed Systems" href="https://sre.google/sre-book/monitoring-distributed-systems/" />
+  <SourceCitation label="Google SRE Book: Service Level Objectives" href="https://sre.google/sre-book/service-level-objectives/" />
+  <SourceCitation label="Anthropic evaluation tool documentation" href="https://platform.claude.com/docs/en/test-and-evaluate/eval-tool" />
+  <SourceCitation label="OpenAI Cookbook GitHub repository" href="https://github.com/openai/openai-cookbook" />
+  <SourceCitation label="Promptfoo GitHub repository" href="https://github.com/promptfoo/promptfoo" />
+  <SourceCitation label="MLflow GitHub repository" href="https://github.com/mlflow/mlflow" />
+  <SourceCitation label="OpenTelemetry GenAI semantic conventions GitHub repository" href="https://github.com/open-telemetry/semantic-conventions-genai" />
+</div>
+
+## Final mental model
+
+An AI system is a production workflow that happens to include models. The model matters, but the surrounding system decides whether the feature is usable, secure, debuggable, affordable, and safe to change.
+
+Before shipping an AI feature, ask:
+
+1. What model, prompt, data, retrieval index, tool, and policy versions produced this output?
+2. What traces and metrics prove where time, cost, and errors came from?
+3. What evaluation gates block quality regressions?
+4. What fallback protects users when evidence, tools, or models fail?
+5. What can we roll back quickly during an incident?
+
+If you can answer those questions, you are thinking like an AI systems engineer.

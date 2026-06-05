@@ -3,8 +3,10 @@ import { ArrowRight, BookOpen, CheckCircle2, Map } from "lucide-react";
 import { LearningModuleCard } from "@/components/LearningModuleCard";
 import {
   agentsAndToolUseLesson,
+  aiSystemsLesson,
   attentionLesson,
   dataPipelinesLesson,
+  fineTuningLesson,
   learningModules,
   llmFoundationsLesson,
   ragSystemsLesson,
@@ -77,6 +79,12 @@ export default function CurriculumPage() {
             </Link>
             <Link className="button button--secondary" href="/lessons/data-pipelines">
               Continue to {dataPipelinesLesson.title} <ArrowRight aria-hidden="true" size={18} />
+            </Link>
+            <Link className="button button--secondary" href="/lessons/fine-tuning">
+              Continue to {fineTuningLesson.title} <ArrowRight aria-hidden="true" size={18} />
+            </Link>
+            <Link className="button button--secondary" href="/lessons/ai-systems">
+              Continue to {aiSystemsLesson.title} <ArrowRight aria-hidden="true" size={18} />
             </Link>
           </article>
           <aside className="curriculum-side">
