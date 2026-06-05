@@ -535,6 +535,46 @@ Trace the generation:
 8. The model predicts the next token conditioned on the prompt plus "A".
 9. The loop continues until the model emits a stop signal or reaches a token limit.
 
+## Implementation sketch: decoding settings in code
+
+This simplified code shows the job of a decoder: turn raw logits into a probability distribution, optionally sharpen or flatten it with temperature, then choose a token. Real systems call a model to get logits; this example starts from fake logits so you can see the decoding step alone.
+
+```ts
+const vocabulary = [" Paris", " London", " banana", "."];
+const logits = [4.0, 1.8, -1.0, 0.5];
+
+function softmax(scores: number[]) {
+  const maxScore = Math.max(...scores);
+  const expScores = scores.map((score) => Math.exp(score - maxScore));
+  const total = expScores.reduce((sum, value) => sum + value, 0);
+  return expScores.map((value) => value / total);
+}
+
+function applyTemperature(scores: number[], temperature: number) {
+  return scores.map((score) => score / temperature);
+}
+
+function greedyDecode(scores: number[]) {
+  let bestIndex = 0;
+  for (let index = 1; index < scores.length; index += 1) {
+    if (scores[index] > scores[bestIndex]) bestIndex = index;
+  }
+  return vocabulary[bestIndex];
+}
+
+const lowTemperatureProbabilities = softmax(applyTemperature(logits, 0.3));
+const highTemperatureProbabilities = softmax(applyTemperature(logits, 1.5));
+const selectedToken = greedyDecode(logits);
+
+console.log({
+  selectedToken,
+  lowTemperatureProbabilities,
+  highTemperatureProbabilities,
+});
+```
+
+The important idea is not the exact JavaScript. The important idea is the boundary: the model produces scores, and the decoding policy turns those scores into output tokens.
+
 <Quiz
   question="When a generated answer is already halfway complete, what is the model predicting next?"
   options={[
@@ -605,10 +645,14 @@ You are ready to continue when you can:
 
 <SourceCitation label="Sennrich et al., Neural Machine Translation of Rare Words with Subword Units" href="https://arxiv.org/abs/1508.07909" />
 
-<SourceCitation label="OpenAI text generation guide" href="https://platform.openai.com/docs/guides/text" />
+<SourceCitation label="OpenAI text generation guide" href="https://developers.openai.com/api/docs/guides/text" />
 
-<SourceCitation label="OpenAI prompt engineering guide" href="https://platform.openai.com/docs/guides/prompt-engineering" />
+<SourceCitation label="OpenAI prompt engineering guide" href="https://developers.openai.com/api/docs/guides/prompt-engineering" />
 
 <SourceCitation label="OpenAI tiktoken repository" href="https://github.com/openai/tiktoken" />
 
 <SourceCitation label="Hugging Face Transformers generation strategies" href="https://huggingface.co/docs/transformers/v4.44.1/generation_strategies" />
+
+<SourceCitation label="OpenAI Cookbook examples repository" href="https://github.com/openai/openai-cookbook" />
+
+<SourceCitation label="Hugging Face Transformers repository" href="https://github.com/huggingface/transformers" />

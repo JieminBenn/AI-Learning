@@ -423,6 +423,49 @@ The output is not a copied token. It is a new vector built from a weighted mixtu
 
 This matters in professional debugging. If attention weights are unexpectedly concentrated on irrelevant tokens, the output representation can carry the wrong evidence. In modern systems, this is one reason engineers inspect attention patterns, retrieved context, and model outputs together rather than trusting one visualization alone.
 
+## Implementation sketch: attention weights in code
+
+This tiny example is not a production attention kernel. It is a beginner-sized way to connect the equation to executable steps: dot products, scaling, softmax, and weighted value mixing.
+
+```ts
+function dot(a: number[], b: number[]) {
+  return a.reduce((sum, value, index) => sum + value * b[index], 0);
+}
+
+function softmax(scores: number[]) {
+  const maxScore = Math.max(...scores);
+  const expScores = scores.map((score) => Math.exp(score - maxScore));
+  const total = expScores.reduce((sum, value) => sum + value, 0);
+  return expScores.map((value) => value / total);
+}
+
+function weightedSum(weights: number[], values: number[][]) {
+  return values[0].map((_, dimension) =>
+    values.reduce((sum, value, index) => sum + weights[index] * value[dimension], 0)
+  );
+}
+
+const query = [1, 0];
+const keys = [
+  [1, 0],
+  [0.5, 0.5],
+  [0, 1],
+];
+const values = [
+  [10, 0],
+  [4, 4],
+  [0, 10],
+];
+
+const scaledScores = keys.map((key) => dot(query, key) / Math.sqrt(query.length));
+const weights = softmax(scaledScores);
+const output = weightedSum(weights, values);
+
+console.log({ scaledScores, weights, output });
+```
+
+Professional note: real Transformer implementations batch this operation across examples, positions, heads, and layers. They also handle masks, padding, numerical precision, memory layout, and specialized kernels.
+
 ## Section 3.3.2: Multi-head attention
 
 One attention head gives one learned way to compare tokens. Multi-head attention gives several learned comparison spaces in parallel.
@@ -746,7 +789,7 @@ BLEU is not a perfect measure of translation quality. It can miss meaning, fluen
 The headline results:
 
 - On WMT 2014 English-to-German, the big Transformer achieved 28.4 BLEU.
-- On WMT 2014 English-to-French, the big Transformer achieved 41.0 BLEU.
+- On WMT 2014 English-to-French, the big Transformer achieved 41.0 BLEU in the paper body, and the abstract reports a 41.8 BLEU single-model headline result after checkpoint averaging.
 - The base Transformer already surpassed many earlier published systems at lower estimated training cost.
 - The big Transformer beat prior single-model systems on English-to-French with less than one quarter of the training cost of the previous state-of-the-art model cited in the paper.
 
@@ -920,3 +963,7 @@ You should not need to read the paper separately to understand its main argument
 <SourceCitation label="Attention Is All You Need paper" href="/papers/attention-is-all-you-need.pdf" />
 
 <SourceCitation label="Tensor2Tensor repository referenced by the paper" href="https://github.com/tensorflow/tensor2tensor" />
+
+<SourceCitation label="HarvardNLP Annotated Transformer repository" href="https://github.com/harvardnlp/annotated-transformer" />
+
+<SourceCitation label="The Annotated Transformer implementation guide" href="https://nlp.seas.harvard.edu/annotated-transformer/" />

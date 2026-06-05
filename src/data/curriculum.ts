@@ -61,6 +61,10 @@ export const attentionLesson: LessonMeta = {
       label: "Attention Is All You Need paper",
       href: "/papers/attention-is-all-you-need.pdf",
     },
+    {
+      label: "HarvardNLP Annotated Transformer repository",
+      href: "https://github.com/harvardnlp/annotated-transformer",
+    },
   ],
 };
 
@@ -97,11 +101,19 @@ export const llmFoundationsLesson: LessonMeta = {
     },
     {
       label: "OpenAI text generation guide",
-      href: "https://platform.openai.com/docs/guides/text",
+      href: "https://developers.openai.com/api/docs/guides/text",
     },
     {
       label: "OpenAI prompt engineering guide",
-      href: "https://platform.openai.com/docs/guides/prompt-engineering",
+      href: "https://developers.openai.com/api/docs/guides/prompt-engineering",
+    },
+    {
+      label: "OpenAI Cookbook examples repository",
+      href: "https://github.com/openai/openai-cookbook",
+    },
+    {
+      label: "Hugging Face Transformers repository",
+      href: "https://github.com/huggingface/transformers",
     },
   ],
 };

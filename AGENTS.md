@@ -14,6 +14,8 @@ This project teaches AI engineering, machine learning engineering, AI infrastruc
 - Do not leave important claims as unsupported assertions. Explain the reasoning, give a concrete example, and cite the source that justifies the claim.
 - Prefer clear diagrams, tables, math blocks, and short checks for understanding over dense prose.
 - Explain every equation symbol directly near the equation.
+- Include code examples when they help the learner reconstruct the idea in practice. Keep beginner-facing code small, annotated, and tied directly to the concept being taught; avoid code when it would distract from a paper-reading or conceptual lesson.
+- Add additional resources for implementation whenever plausible: GitHub repositories, official example notebooks, API examples, reference implementations, or runnable demos. Prefer maintained primary or official examples over random snippets.
 - Avoid unexplained acronyms. Write the full phrase first, then introduce the acronym.
 - Do not present a topic as complete unless the learner can explain it, reason about failure modes, and identify where it appears in production systems.
 
@@ -28,9 +30,11 @@ Every major lesson should include:
 - Diagrams or structured visual explanations.
 - Equations where the topic requires math.
 - Implementation or systems context.
+- Code examples where the topic benefits from seeing the idea executed.
 - Common misconceptions.
 - Practice checks.
 - Primary-source citations.
+- Additional implementation resources, especially official docs, GitHub repositories, notebooks, or examples.
 
 ## Scope Discipline
 
