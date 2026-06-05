@@ -73,6 +73,52 @@ You do not need prior machine learning experience, but you need a few building b
 
 The paper assumes the reader already knows these ideas. This lesson will not.
 
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Attention</td>
+        <td>A way for one token position to choose information from other positions.</td>
+        <td>The routing operation that compares queries with keys, then mixes values into contextual vectors.</td>
+      </tr>
+      <tr>
+        <td>Self-attention</td>
+        <td>Attention where the same sequence supplies the queries, keys, and values.</td>
+        <td>The core Transformer operation that lets all positions in a layer exchange information in parallel.</td>
+      </tr>
+      <tr>
+        <td>Query, key, value</td>
+        <td>Three learned views of a token representation: what it seeks, how it can be matched, and what it contributes.</td>
+        <td>The projected matrices `Q`, `K`, and `V` used in scaled dot-product attention.</td>
+      </tr>
+      <tr>
+        <td>Mask</td>
+        <td>A rule that hides positions the model should not use.</td>
+        <td>Essential for decoder training so a model cannot see future target tokens.</td>
+      </tr>
+      <tr>
+        <td>Residual connection</td>
+        <td>A shortcut that adds a layer's input back to its output.</td>
+        <td>A stability pattern that helps deep Transformer stacks preserve information and train reliably.</td>
+      </tr>
+      <tr>
+        <td>Positional encoding</td>
+        <td>Extra information that tells the model where each token appears.</td>
+        <td>The mechanism that gives an order-blind attention operation access to sequence order.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
 ## The paper's central claim
 
 Before the Transformer, strong sequence models usually combined an <GlossaryTerm term="encoder">a network that reads the input sequence and produces useful internal representations.</GlossaryTerm> with a <GlossaryTerm term="decoder">a network that produces the output sequence.</GlossaryTerm> The dominant encoder-decoder systems often used recurrent neural networks or convolutional neural networks, sometimes with an attention mechanism added on top.
@@ -957,6 +1003,14 @@ You should not need to read the paper separately to understand its main argument
 - Distinguish path length from computational complexity.
 - Separate the architecture choices from the training recipe.
 - Use the ablation results to identify which design choices seem robust and which seem sensitive.
+
+## You are ready for the next lesson when...
+
+- You can explain why self-attention lets each token gather information from other tokens in the same sequence.
+- You can describe how queries, keys, values, softmax weights, and value mixing work together.
+- You can explain why positional information is necessary in a Transformer.
+- You can identify the main production risks: masking bugs, padding bugs, shape bugs, and long-context cost.
+- You can connect the original translation paper to modern language models without treating them as the same system.
 
 ## Sources
 
