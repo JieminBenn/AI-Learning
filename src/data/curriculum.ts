@@ -64,6 +64,48 @@ export const attentionLesson: LessonMeta = {
   ],
 };
 
+export const llmFoundationsLesson: LessonMeta = {
+  slug: "llm-foundations",
+  title: "LLM Foundations",
+  level: "Beginner",
+  prerequisites: [
+    "Complete the Transformer basics lesson first, or know what tokens, embeddings, attention, and softmax mean",
+    "No production AI experience required",
+    "Comfort with simple probability and algebra helps, but every symbol is explained",
+  ],
+  tags: ["LLMs", "Language Modeling", "Prompting", "Evaluation"],
+  objectives: [
+    "Define large language model, tokenization, context window, next-token prediction, pretraining, decoding, prompting, instruction tuning, and evaluation from first principles.",
+    "Explain how an autoregressive model turns a prompt into one token at a time.",
+    "Read the core next-token prediction objective and explain every symbol.",
+    "Compare greedy decoding, sampling, temperature, top-k, top-p, and beam search at a practical level.",
+    "Reason about professional failure modes such as hallucination, context overflow, prompt sensitivity, nondeterminism, and evaluation mismatch.",
+  ],
+  outcomes: [
+    "You can explain what an LLM is doing when it answers a prompt without saying it is simply thinking or searching the web.",
+    "You can choose basic prompt, decoding, and evaluation strategies for an AI application.",
+    "You can identify when model behavior is caused by training objective, context limits, sampling settings, alignment training, or missing external evidence.",
+  ],
+  sources: [
+    {
+      label: "Language Models are Few-Shot Learners",
+      href: "https://arxiv.org/abs/2005.14165",
+    },
+    {
+      label: "Training language models to follow instructions with human feedback",
+      href: "https://arxiv.org/abs/2203.02155",
+    },
+    {
+      label: "OpenAI text generation guide",
+      href: "https://platform.openai.com/docs/guides/text",
+    },
+    {
+      label: "OpenAI prompt engineering guide",
+      href: "https://platform.openai.com/docs/guides/prompt-engineering",
+    },
+  ],
+};
+
 export const topics: Topic[] = [
   {
     slug: "rag",

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, CheckCircle2, Map } from "lucide-react";
 import { LearningModuleCard } from "@/components/LearningModuleCard";
-import { attentionLesson, learningModules, topics } from "@/data/curriculum";
+import { attentionLesson, learningModules, llmFoundationsLesson, topics } from "@/data/curriculum";
 
 export const metadata = {
   title: "AI Engineering Curriculum Overview",
@@ -57,6 +57,9 @@ export default function CurriculumPage() {
             </ul>
             <Link className="button button--primary" href="/lessons/attention-is-all-you-need">
               Open lesson <ArrowRight aria-hidden="true" size={18} />
+            </Link>
+            <Link className="button button--secondary" href="/lessons/llm-foundations">
+              Continue to {llmFoundationsLesson.title} <ArrowRight aria-hidden="true" size={18} />
             </Link>
           </article>
           <aside className="curriculum-side">

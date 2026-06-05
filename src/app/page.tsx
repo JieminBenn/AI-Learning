@@ -35,7 +35,10 @@ const roadmapDestinations: Record<string, { href: string; label: string }[]> = {
   "Basics of Transformers": [
     { href: "/lessons/attention-is-all-you-need", label: "Open Attention lesson" },
   ],
-  "LLM Foundations": [{ href: "/models", label: "Explore model families" }],
+  "LLM Foundations": [
+    { href: "/lessons/llm-foundations", label: "Open LLM Foundations lesson" },
+    { href: "/models", label: "Explore model families" },
+  ],
   "RAG Systems": [{ href: "/topics/rag", label: "Open RAG topic" }],
   "Agents and Tool Use": [
     { href: "/topics/agents", label: "Open Agents topic" },

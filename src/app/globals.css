@@ -644,6 +644,122 @@ button {
   background: #fff1f2;
 }
 
+.diagram-node strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.diagram-node span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.argument-flow,
+.residual-flow {
+  display: grid;
+  gap: 10px;
+}
+
+.argument-flow {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.residual-flow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mask-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.mask-row {
+  display: grid;
+  grid-template-columns: 52px repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.mask-row strong,
+.mask-cell {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.mask-row strong {
+  background: var(--night);
+  color: white;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.mask-cell.allow {
+  border: 1px solid #c9dfd5;
+  background: #edf8f1;
+  color: var(--teal-dark);
+}
+
+.mask-cell.block {
+  border: 1px solid #e8c1c7;
+  background: #fff1f2;
+  color: var(--coral);
+}
+
+.mask-diagram p {
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.complexity-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.complexity-pair > div {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f9fbfb;
+}
+
+.complexity-pair strong {
+  font-size: 1.05rem;
+}
+
+.complexity-pair span {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.score-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.score-grid.small {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.score-grid.large {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.score-grid i {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: #c9dfd5;
+}
+
 .transformer-flow {
   display: grid;
   gap: 8px;
@@ -1146,6 +1262,18 @@ button {
   .source-band {
     align-items: stretch;
   }
+
+  .argument-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .argument-flow .diagram-node.output {
+    grid-column: span 2;
+  }
+
+  .residual-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -1241,11 +1369,18 @@ button {
   .model-dashboard,
   .diagram-grid,
   .diagram-grid.compact,
+  .argument-flow,
+  .residual-flow,
+  .complexity-pair,
   .attention-flow,
   .qkv-grid,
   .position-row,
   .matrix-strip {
     grid-template-columns: 1fr;
+  }
+
+  .argument-flow .diagram-node.output {
+    grid-column: auto;
   }
 
   .diagram-node.wide {

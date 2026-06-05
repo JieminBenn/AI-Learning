@@ -18,6 +18,27 @@ We will move in the same order as the paper:
 5. The evidence: translation results, cost comparison, and ablation studies.
 6. The professional meaning: when Transformers help, where they are expensive, and what can go wrong in production systems.
 
+## Explain it in 5 minutes
+
+The Transformer is a way to turn a sequence of tokens into useful contextual vectors without processing the sequence one step at a time. A <GlossaryTerm term="contextual vector">a vector whose meaning depends on the surrounding tokens, not just the current token alone.</GlossaryTerm> The word "bank" should have a different representation in "river bank" than in "bank account." Attention is the operation that makes that happen.
+
+Here is the whole idea in one pass:
+
+1. Split text into tokens, then convert each token into an embedding vector.
+2. Add position information, because attention by itself does not know token order.
+3. For each token, create three learned views: a query, a key, and a value.
+4. Compare queries with keys to decide which tokens should exchange information.
+5. Use softmax to turn comparison scores into weights.
+6. Mix value vectors using those weights, producing a new contextual representation.
+7. Repeat this inside stacked encoder and decoder layers, with feed-forward networks, residual connections, and layer normalization keeping the computation expressive and trainable.
+8. In the decoder, hide future output tokens with a mask so generation cannot cheat.
+
+The paper's breakthrough was not merely "attention exists." Earlier models already used attention. The breakthrough was showing that attention plus feed-forward layers could become the main sequence-processing backbone, replacing recurrence and convolution for the translation tasks studied in the paper. That made training more parallel, shortened the path between far-apart tokens, and achieved strong translation quality at much lower reported training cost than several prior systems.
+
+<ConceptDiagram type="paperArgument" />
+
+If you only remember one tradeoff, remember this: full self-attention lets every token directly compare with every other token, but that creates an `n` by `n` attention score matrix. Direct communication is powerful; long context is expensive.
+
 <CheckUnderstanding prompt="Before reading: what should you be able to do by the end?">
 You should be able to explain the Transformer as an information-routing architecture. You should also be able to read the paper's core equations, explain every symbol, describe the encoder and decoder data flow, reason about why self-attention parallelizes, and identify the main tradeoff: full self-attention gives short paths between tokens but costs roughly quadratic work in sequence length.
 </CheckUnderstanding>
@@ -110,6 +131,50 @@ That claim mattered because it changed the engineering profile of sequence model
   </table>
 </div>
 
+## How the paper builds its argument section by section
+
+Read the paper like an engineering argument, not like a list of components. Each section answers a different question.
+
+### Abstract and Introduction: what is the bottleneck?
+
+The abstract makes three claims at once: the model removes recurrence, relies entirely on attention for global dependencies, and trains faster while reaching strong translation results. The introduction explains why this matters. Recurrent models create a sequential chain over positions, which limits parallel computation. Convolutional models parallelize better, but long-distance relationships require multiple layers or wider patterns.
+
+Beginner move: whenever the paper says "dependencies," translate that into "one token needs information from another token." For example, a pronoun may need information from a noun many words earlier.
+
+### Background: what is actually new?
+
+The background section prevents a common misreading. The authors did not invent every use of attention. Earlier encoder-decoder systems used attention, and other work explored convolutional sequence models. The new move was to make self-attention the main way information moves between positions in both the encoder and decoder.
+
+Beginner move: separate "attention as a helper" from "attention as the backbone." The paper's claim depends on the second idea.
+
+### Model Architecture: how does the information flow?
+
+This section is the blueprint. The encoder repeatedly applies self-attention and feed-forward layers. The decoder adds masked self-attention and encoder-decoder attention. Residual connections and layer normalization wrap every sub-layer so the model can be trained as a deep stack rather than as one fragile transformation.
+
+Beginner move: do not try to memorize Figure 1 all at once. Trace one token through one sub-layer, then one encoder layer, then one decoder layer.
+
+### Attention: what is the exact operation?
+
+The attention section turns the intuition into equations. A query-key dot product creates a compatibility score. Scaling keeps scores numerically manageable. Softmax turns scores into weights. The weighted sum of values creates the output. Multi-head attention repeats this in several learned subspaces.
+
+Beginner move: read every matrix equation as a shape-and-meaning statement. Ask: What are the rows? What does each entry mean? What dimension must match?
+
+### Why Self-Attention: what tradeoff are the authors making?
+
+This section is the professional heart of the paper. Self-attention has constant path length between positions and can be parallelized across positions inside a layer. The cost is the quadratic `n^2` comparison matrix. The authors argue this is a good tradeoff for the sequence lengths and hardware setting they study.
+
+Beginner move: do not confuse "parallel" with "free." Self-attention removes a sequential dependency, but it still performs many pairwise comparisons.
+
+### Training and Results: did the idea work under a real recipe?
+
+The training section explains the system around the architecture: tokenization, batching, optimizer, learning-rate schedule, dropout, label smoothing, checkpoint averaging, and beam search. The results and ablations show both headline quality and sensitivity to design choices like head count, dimensions, dropout, and positional encoding type.
+
+Beginner move: treat the result as architecture plus recipe plus evaluation setting. In professional work, a model is not just a diagram; it is also data, optimization, regularization, decoding, metrics, and hardware cost.
+
+<CheckUnderstanding prompt="What is the paper's argument chain?">
+The paper starts with a bottleneck: recurrent models process positions sequentially, and convolutional models need extra depth or width for long-range dependencies. It proposes self-attention as the main information-routing operation. It builds an encoder-decoder architecture around that operation. It justifies the tradeoff with complexity and path-length comparisons. Then it tests the full system on translation benchmarks and uses ablations to probe which choices matter.
+</CheckUnderstanding>
+
 ## Section 1: Why recurrence was a bottleneck
 
 The introduction starts from a practical problem. A <GlossaryTerm term="recurrent neural network">a network that processes a sequence step by step while carrying a hidden state forward.</GlossaryTerm> reads a sequence in order. For a sentence with positions `1, 2, 3, ..., n`, the recurrent model computes one hidden state per position.
@@ -201,6 +266,8 @@ Every sub-layer is wrapped with a residual connection and layer normalization.
 `x` is the input vector or matrix entering the sub-layer. `Sublayer(x)` is the transformation performed by attention or the feed-forward network. The `+` adds the original input back to the transformed output. `LayerNorm` normalizes the result so activations stay in a more stable range.
 </EquationBlock>
 
+<ConceptDiagram type="residualNorm" />
+
 A <GlossaryTerm term="residual connection">a path that adds a layer's input to its output.</GlossaryTerm> helps information and gradients move through deep networks. Without residual paths, later layers can accidentally destroy useful earlier information or become harder to train.
 
 <GlossaryTerm term="Layer normalization">a normalization method that rescales features inside each example.</GlossaryTerm> helps keep the numerical values manageable as representations pass through many layers.
@@ -209,7 +276,11 @@ The paper sets `d_model = 512` for the base model. This means the main represent
 
 Professional context: shape compatibility is a real implementation constraint. You cannot add two tensors unless their dimensions match or broadcast in a valid way. The paper's architecture keeps the main stream at `d_model` so residual connections are simple.
 
-## Section 3.1: Decoder stack from the paper
+<CheckUnderstanding prompt="Why do residual connections require matching shapes?">
+The residual path adds the sub-layer input to the sub-layer output. Addition happens component by component, so both tensors need compatible dimensions. In the base Transformer, the main stream stays at `d_model = 512`, which makes those additions straightforward.
+</CheckUnderstanding>
+
+## Section 3.2: Decoder stack from the paper
 
 The decoder also has `N = 6` layers, but each decoder layer has three sub-layers:
 
@@ -219,13 +290,15 @@ The decoder also has `N = 6` layers, but each decoder layer has three sub-layers
 
 The first attention block is masked because the decoder must preserve autoregressive generation. During training, the correct output sentence is known, but the model must be trained as if it only knows earlier target tokens at each position.
 
+<ConceptDiagram type="masking" />
+
 The second attention block is encoder-decoder attention. Its queries come from the decoder, while its keys and values come from the encoder output. In plain language, the decoder asks: "Given what I have generated so far, which source-language positions should I use now?"
 
 <CheckUnderstanding prompt="What is the difference between encoder self-attention and encoder-decoder attention?">
 Encoder self-attention uses queries, keys, and values from the input-side encoder stream. Encoder-decoder attention uses queries from the decoder stream, but keys and values from the encoder output, so the decoder can look back at the encoded source sentence.
 </CheckUnderstanding>
 
-## Section 3.2: Attention from zero
+## Section 3.3: Attention from zero
 
 Attention is a learned way to route information. One vector asks for information. Other vectors advertise what information they contain. The model computes match scores, turns those scores into weights, and uses the weights to mix content vectors.
 
@@ -246,7 +319,7 @@ At the token "it," a useful query might search for an object that can be replace
 
 This is not hard-coded. The model learns the projections that create queries, keys, and values during training.
 
-## Section 3.2.1: Scaled dot-product attention
+## Section 3.3.1: Scaled dot-product attention
 
 The core equation is the heart of the paper.
 
@@ -313,6 +386,10 @@ This is the mechanism behind the phrase "a token attends to other tokens." More 
 
 <ConceptDiagram type="attention" />
 
+<CheckUnderstanding prompt="Does attention copy the most important token?">
+Not usually. Attention produces a weighted mixture of value vectors. One token may receive the largest weight, but the output is still a new vector built from all values with nonzero weights. That distinction matters because the representation can blend evidence from several positions.
+</CheckUnderstanding>
+
 <Quiz
   question="In scaled dot-product attention, what does `QK^T` produce?"
   options={[
@@ -346,7 +423,7 @@ The output is not a copied token. It is a new vector built from a weighted mixtu
 
 This matters in professional debugging. If attention weights are unexpectedly concentrated on irrelevant tokens, the output representation can carry the wrong evidence. In modern systems, this is one reason engineers inspect attention patterns, retrieved context, and model outputs together rather than trusting one visualization alone.
 
-## Section 3.2.2: Multi-head attention
+## Section 3.3.2: Multi-head attention
 
 One attention head gives one learned way to compare tokens. Multi-head attention gives several learned comparison spaces in parallel.
 
@@ -374,11 +451,15 @@ Concrete language example:
 
 The paper does not claim heads are always cleanly interpretable, but it presents the possibility that attention patterns can expose some syntactic or semantic behavior.
 
+<CheckUnderstanding prompt="What does a head dimension of 64 mean in the base model?">
+It means each attention head works in a 64-dimensional projected space. The original token stream is 512-dimensional, but each of the 8 heads receives its own learned 64-dimensional query, key, and value projections. After attention runs in parallel, the 8 outputs are concatenated back to 512 dimensions and projected again.
+</CheckUnderstanding>
+
 <CheckUnderstanding prompt="Why does multi-head attention keep computational cost similar to one full-width head in the paper's base model?">
 Each head uses a reduced dimension. With `h = 8` and `d_model = 512`, each head uses width `64`. Running eight narrower heads can have similar total cost to running one full-width attention operation, while giving the model multiple learned comparison spaces.
 </CheckUnderstanding>
 
-## Section 3.2.3: The three attention uses in the Transformer
+## Section 3.3.3: The three attention uses in the Transformer
 
 The paper uses multi-head attention in three places.
 
@@ -404,7 +485,7 @@ Queries come from the decoder. Keys and values come from the encoder output. Thi
 
 Professional meaning: this is the translation alignment mechanism. When generating a German word, the decoder can focus on relevant English source positions.
 
-## Section 3.3: Position-wise feed-forward networks
+## Section 3.4: Position-wise feed-forward networks
 
 Attention lets positions communicate. The feed-forward network transforms each position independently after communication.
 
@@ -425,7 +506,7 @@ That means the feed-forward block expands each token vector from 512 dimensions 
 
 Professional context: in many modern Transformer variants, feed-forward blocks contain a large share of the model's parameters and compute. Attention is conceptually famous, but the feed-forward layers are also a major part of model capacity.
 
-## Section 3.4: Embeddings and output probabilities
+## Section 3.5: Embeddings and output probabilities
 
 The Transformer must convert discrete tokens into vectors.
 
@@ -448,7 +529,7 @@ The paper shares the same weight matrix between source embeddings, target embedd
 
 Why share weights? It reduces parameters and ties the input and output token representation spaces together. In language modeling and translation, the same vocabulary items often benefit from related input and output representations.
 
-## Section 3.5: Positional encoding
+## Section 3.6: Positional encoding
 
 Self-attention alone has no built-in sense of order. If you give it the same token vectors in a different order, attention still compares token content, but the architecture itself does not know which token came first.
 
@@ -462,6 +543,10 @@ The tokens are similar, but the meaning changes because the order changes. The m
 The paper adds positional encodings to the token embeddings at the bottom of the encoder and decoder stacks.
 
 <ConceptDiagram type="positional" />
+
+<CheckUnderstanding prompt="Why is position added instead of replacing the token embedding?">
+The model needs both token meaning and token order. Adding the positional vector combines the learned token representation with an order signal while preserving the same `d_model` width expected by the rest of the Transformer stack.
+</CheckUnderstanding>
 
 The sinusoidal positional encoding is:
 
@@ -537,6 +622,8 @@ Symbol meanings:
 Self-attention's major advantage is path length. Any token can directly connect to any other token in one attention layer, so maximum path length is `O(1)`.
 
 Self-attention's major cost is the `n^2` term. Full attention compares every token with every other token. If sequence length doubles, the attention score matrix grows by about four times.
+
+<ConceptDiagram type="complexity" />
 
 <EquationBlock title="Why full attention is quadratic in sequence length" equation={"number_of_pairwise_scores = n * n = n^2"}>
 If there are `n` query positions and `n` key positions, every query compares with every key. That creates `n^2` scores per head before values are mixed.

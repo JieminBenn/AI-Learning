@@ -1,5 +1,15 @@
 type ConceptDiagramProps = {
-  type: "transformer" | "attention" | "qkv" | "positional" | "rag" | "agent";
+  type:
+    | "transformer"
+    | "paperArgument"
+    | "attention"
+    | "qkv"
+    | "residualNorm"
+    | "masking"
+    | "complexity"
+    | "positional"
+    | "rag"
+    | "agent";
 };
 
 export function ConceptDiagram({ type }: ConceptDiagramProps) {
@@ -60,6 +70,36 @@ export function ConceptDiagram({ type }: ConceptDiagramProps) {
     );
   }
 
+  if (type === "paperArgument") {
+    return (
+      <figure className="concept-diagram paper-argument-diagram">
+        <figcaption>The paper&apos;s argument in one pass</figcaption>
+        <div className="argument-flow">
+          <div className="diagram-node input">
+            <strong>Problem</strong>
+            <span>Sequential models limit parallel training and lengthen dependency paths.</span>
+          </div>
+          <div className="diagram-node">
+            <strong>Design move</strong>
+            <span>Use attention as the main token-to-token communication operation.</span>
+          </div>
+          <div className="diagram-node accent">
+            <strong>Mechanism</strong>
+            <span>Queries compare with keys, then weights mix values.</span>
+          </div>
+          <div className="diagram-node">
+            <strong>Architecture</strong>
+            <span>Stack attention, feed-forward layers, residual paths, normalization, and positions.</span>
+          </div>
+          <div className="diagram-node output">
+            <strong>Evidence</strong>
+            <span>Translation quality improves while training cost drops versus strong baselines.</span>
+          </div>
+        </div>
+      </figure>
+    );
+  }
+
   if (type === "attention") {
     return (
       <figure className="concept-diagram attention-diagram">
@@ -91,6 +131,85 @@ export function ConceptDiagram({ type }: ConceptDiagramProps) {
           <div>
             <strong>Value</strong>
             <span>What content should I pass along?</span>
+          </div>
+        </div>
+      </figure>
+    );
+  }
+
+  if (type === "residualNorm") {
+    return (
+      <figure className="concept-diagram residual-diagram">
+        <figcaption>Every sub-layer keeps a stable main stream</figcaption>
+        <div className="residual-flow">
+          <div className="diagram-node input">
+            <strong>x</strong>
+            <span>Current token representation</span>
+          </div>
+          <div className="diagram-node">
+            <strong>Sublayer(x)</strong>
+            <span>Attention or feed-forward transform</span>
+          </div>
+          <div className="diagram-node accent">
+            <strong>x + Sublayer(x)</strong>
+            <span>Add the old path back in</span>
+          </div>
+          <div className="diagram-node output">
+            <strong>LayerNorm</strong>
+            <span>Rescale features before the next block</span>
+          </div>
+        </div>
+      </figure>
+    );
+  }
+
+  if (type === "masking") {
+    return (
+      <figure className="concept-diagram mask-diagram">
+        <figcaption>Masked decoder self-attention</figcaption>
+        <div className="mask-grid" aria-label="Allowed and blocked decoder attention positions">
+          {[
+            ["y1", "allow", "block", "block"],
+            ["y2", "allow", "allow", "block"],
+            ["y3", "allow", "allow", "allow"],
+          ].map((row) => (
+            <div className="mask-row" key={row[0]}>
+              <strong>{row[0]}</strong>
+              {row.slice(1).map((state, index) => (
+                <span className={`mask-cell ${state}`} key={`${row[0]}-${index}`}>
+                  {state === "allow" ? "can use" : "hidden"}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+        <p>Each output position may look at earlier target tokens, but future target tokens are hidden.</p>
+      </figure>
+    );
+  }
+
+  if (type === "complexity") {
+    return (
+      <figure className="concept-diagram complexity-diagram">
+        <figcaption>Why full attention gets expensive</figcaption>
+        <div className="complexity-pair">
+          <div>
+            <strong>4 tokens</strong>
+            <span>4 x 4 = 16 pairwise scores</span>
+            <div className="score-grid small">
+              {Array.from({ length: 16 }).map((_, index) => (
+                <i key={index} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <strong>8 tokens</strong>
+            <span>8 x 8 = 64 pairwise scores</span>
+            <div className="score-grid large">
+              {Array.from({ length: 64 }).map((_, index) => (
+                <i key={index} />
+              ))}
+            </div>
           </div>
         </div>
       </figure>

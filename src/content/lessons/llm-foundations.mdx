@@ -1,0 +1,614 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson explains what large language models are, how they generate text, and why they behave the way they do in real AI systems. You do not need to know how to train a model from scratch. You do need one mental model:
+
+An LLM is not a database, a search engine, or a person. It is a trained neural network that receives a sequence of tokens and predicts likely next tokens. Useful behavior emerges because the model has learned statistical patterns from enormous text and code datasets, then is often adapted to follow instructions.
+
+We will move from intuition to professional use:
+
+1. What "language model" and "large language model" mean.
+2. How text becomes tokens.
+3. How next-token prediction works.
+4. How a prompt becomes a generated answer.
+5. How decoding settings change output behavior.
+6. Why context windows matter.
+7. Why instruction tuning changes a base model into an assistant-like model.
+8. How engineers evaluate and debug LLM behavior.
+
+## Explain it in 5 minutes
+
+A <GlossaryTerm term="language model">a model that assigns probabilities to sequences of language.</GlossaryTerm> For example, after the words "The capital of France is", a language model should assign high probability to "Paris" and lower probability to unrelated tokens.
+
+A <GlossaryTerm term="large language model">a language model with many learned parameters, usually trained on very large text and code datasets.</GlossaryTerm> A parameter is a learned number inside the model. Large models can represent many patterns, but size alone does not guarantee truthfulness, safety, or usefulness.
+
+Modern LLMs usually generate text <GlossaryTerm term="autoregressively">one step at a time, where each new token is conditioned on previous tokens.</GlossaryTerm> The model receives a prompt, predicts a probability distribution over possible next tokens, a decoding rule chooses one token, and the chosen token is appended to the context. Then the process repeats.
+
+<ConceptDiagram type="transformer" />
+
+The simplest loop is:
+
+1. The prompt is split into tokens.
+2. Token IDs become vectors.
+3. The Transformer processes the context.
+4. The model outputs logits, which are raw scores for possible next tokens.
+5. Softmax turns logits into probabilities.
+6. A decoding strategy selects one token.
+7. The selected token is appended, and the loop continues.
+
+<EquationBlock title="Generation as a loop" equation={"prompt -> probabilities over next token -> choose token -> append token -> repeat"}>
+The model does not produce a whole answer in one magical step. It repeatedly predicts the next token given the tokens currently in its context.
+</EquationBlock>
+
+This explains a lot of LLM behavior. Prompts matter because they are part of the context the next-token distribution depends on. Sampling settings matter because they decide how probabilities are turned into actual text. Context windows matter because the model can only condition on tokens that fit in the request. Evaluation matters because fluent text can still be wrong.
+
+<CheckUnderstanding prompt="What is the shortest accurate description of LLM generation?">
+An LLM receives a token sequence, predicts probabilities for the next token, selects or samples a token, appends it to the sequence, and repeats until it stops.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define token, tokenizer, vocabulary, context window, parameter, logit, softmax, next-token prediction, pretraining, instruction tuning, decoding, temperature, top-k sampling, top-p sampling, beam search, hallucination, and evaluation.
+- Explain why LLMs are often called generative pretrained transformers.
+- Trace how a prompt becomes generated text one token at a time.
+- Read the next-token prediction objective and explain every symbol.
+- Explain why an LLM can answer many tasks without task-specific training examples in its weights.
+- Distinguish base models, instruction-tuned models, and chat assistants.
+- Identify common production failure modes and what engineers measure to reduce risk.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- A <GlossaryTerm term="token">a small unit of data a language model processes.</GlossaryTerm> A token can be a word, part of a word, punctuation mark, whitespace pattern, or special symbol.
+- A <GlossaryTerm term="tokenizer">a system that converts text into token IDs and token IDs back into text.</GlossaryTerm>
+- A <GlossaryTerm term="vocabulary">the set of token IDs a tokenizer can produce.</GlossaryTerm>
+- A <GlossaryTerm term="vector">a list of numbers.</GlossaryTerm> Neural networks represent tokens and internal meanings as vectors.
+- A <GlossaryTerm term="parameter">a learned number inside a model.</GlossaryTerm> Training changes parameters so predictions improve.
+- A <GlossaryTerm term="probability distribution">a set of nonnegative numbers that sum to 1.</GlossaryTerm> LLMs use distributions to represent uncertainty over possible next tokens.
+- A <GlossaryTerm term="Transformer">the neural network architecture built from attention, feed-forward layers, residual paths, normalization, and position information.</GlossaryTerm>
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Base model</td>
+        <td>A model trained mainly to predict text continuations.</td>
+        <td>Useful foundation, but not necessarily good at obeying user instructions.</td>
+      </tr>
+      <tr>
+        <td>Instruction-tuned model</td>
+        <td>A model further trained on instruction-response examples.</td>
+        <td>Usually better for assistant behavior, task following, and conversational workflows.</td>
+      </tr>
+      <tr>
+        <td>Context window</td>
+        <td>The maximum tokens the model can consider in one request.</td>
+        <td>A hard product and infrastructure constraint for prompts, retrieved documents, chat history, tool results, and output.</td>
+      </tr>
+      <tr>
+        <td>Decoding</td>
+        <td>The method used to choose output tokens from probabilities.</td>
+        <td>A major control surface for determinism, creativity, repetition, and latency.</td>
+      </tr>
+      <tr>
+        <td>Evaluation</td>
+        <td>Testing whether model outputs are good enough.</td>
+        <td>The feedback system that lets teams compare prompts, models, retrieval, and safety controls.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: Why they are called generative pretrained transformers
+
+The phrase <GlossaryTerm term="generative pretrained transformer">a Transformer model first trained on a broad prediction objective, then used to generate outputs.</GlossaryTerm> contains three ideas.
+
+Generative means the model creates new token sequences. It can write prose, code, summaries, queries, structured data, and many other text-like outputs.
+
+Pretrained means the model first learns broad patterns from large datasets before it is adapted for particular behavior. In GPT-3, the authors trained an autoregressive language model at very large scale and evaluated it in zero-shot, one-shot, and few-shot settings. That paper helped show that sufficiently large pretrained language models could perform many tasks from prompts without updating model weights for each task.
+
+Transformer means the model uses the attention-based architecture introduced in "Attention Is All You Need" or a later variant of it. Many LLMs use decoder-only Transformers: they are especially suited to predicting the next token while masking future tokens.
+
+Professional context: these three words do not guarantee the same product behavior. A base GPT-style model, an instruction-following assistant, a reasoning model, and a code model can all be Transformer-based language models, but they may differ in training data, post-training, tools, context length, safety policies, and evaluation targets.
+
+## Section 2: Text becomes tokens before the model sees it
+
+The model does not directly see characters or words. It sees token IDs.
+
+Example text:
+
+> "unbelievable!"
+
+A tokenizer might split it into pieces like:
+
+<EquationBlock title="Example tokenization" equation={"unbelievable! -> [un, believable, !]"}>
+This is only an illustrative split. Different tokenizers can split the same string differently.
+</EquationBlock>
+
+Tokenization solves a practical problem. A word-level vocabulary cannot contain every name, typo, compound word, code identifier, and rare term. Subword tokenization lets the model represent unfamiliar words as smaller known pieces. Sennrich, Haddow, and Birch showed that byte-pair encoding could improve neural machine translation for rare and unknown words by representing them as subword units.
+
+OpenAI's `tiktoken` is a byte-pair encoding tokenizer implementation for OpenAI models. The important beginner idea is simple: token counts are not the same as word counts, and tokenization affects cost, context usage, and model behavior.
+
+Professional examples:
+
+- A short English word may be one token.
+- A rare technical word may be several tokens.
+- Code, URLs, tables, and non-English text can tokenize differently than plain English prose.
+- A prompt that looks short to a person may be expensive if it includes long logs, JSON, or repeated documents.
+
+<Quiz
+  question="Why do LLMs use subword tokens instead of only whole words?"
+  options={[
+    "Subwords let the model represent rare, new, misspelled, or compound words using reusable pieces.",
+    "Subwords remove the need for a context window.",
+    "Subwords guarantee that generated facts are correct.",
+  ]}
+  correctIndex={0}
+  explanation="Subword tokenization helps with open-vocabulary text, but it does not solve truthfulness or context limits."
+/>
+
+## Section 3: Next-token prediction is the core training signal
+
+The central language modeling task is:
+
+Given previous tokens, predict the next token.
+
+If the training text is:
+
+> "The model predicts the next token"
+
+The model can be trained on many prediction examples from the same sequence:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Context</th>
+        <th>Target next token</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>The</td>
+        <td>model</td>
+      </tr>
+      <tr>
+        <td>The model</td>
+        <td>predicts</td>
+      </tr>
+      <tr>
+        <td>The model predicts</td>
+        <td>the</td>
+      </tr>
+      <tr>
+        <td>The model predicts the</td>
+        <td>next</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The formal objective often appears as maximizing the probability of each real next token given the previous tokens.
+
+<EquationBlock title="Autoregressive language modeling objective" equation={"maximize product_{t=1}^{T} P(x_t | x_1, ..., x_{t-1})"}>
+`T` is the number of tokens in the sequence. `x_t` is the token at position `t`. `x_1, ..., x_{t-1}` are the earlier tokens. `P(x_t | x_1, ..., x_{t-1})` is the probability the model assigns to the correct next token given the earlier context. `product` means multiply these probabilities across positions.
+</EquationBlock>
+
+In practice, training usually minimizes negative log likelihood, which is equivalent to making the correct next tokens more probable.
+
+<EquationBlock title="Negative log likelihood loss" equation={"loss = - sum_{t=1}^{T} log P(x_t | x_1, ..., x_{t-1})"}>
+`loss` is the error signal training tries to reduce. `sum` means add across token positions. `log` is the logarithm. The minus sign turns high probability for correct tokens into low loss.
+</EquationBlock>
+
+Professional context: the objective is simple, but the learned behavior is broad. To predict next tokens well across many documents, the model must learn patterns about grammar, facts, styles, code syntax, reasoning traces, formatting, and task demonstrations. This does not mean it has a perfect world model. It means many useful behaviors are rewarded indirectly by the prediction task.
+
+## Section 4: From logits to probabilities
+
+At each generation step, the model produces one raw score for every token in the vocabulary. These raw scores are called <GlossaryTerm term="logits">unnormalized scores before softmax turns them into probabilities.</GlossaryTerm>
+
+<EquationBlock title="Softmax over vocabulary logits" equation={"P(token_i) = exp(logit_i) / sum_j exp(logit_j)"}>
+`token_i` is one possible next token. `logit_i` is that token's raw score. `exp` is the exponential function. `sum_j exp(logit_j)` adds the exponentials of all vocabulary logits. The output is a probability for `token_i`.
+</EquationBlock>
+
+If the model assigns high probability to "Paris" after "The capital of France is", that means "Paris" is a likely continuation under the model's learned distribution and current context. It does not mean the model looked up the answer in a live database unless the system gave it a retrieval or browsing tool.
+
+<ConceptDiagram type="attention" />
+
+## Section 5: Decoding turns probabilities into text
+
+Decoding is the policy for choosing the next token from the probability distribution.
+
+### Greedy decoding
+
+Greedy decoding always chooses the highest-probability token.
+
+Benefit: predictable and simple.
+
+Risk: can get repetitive, bland, or stuck in local choices.
+
+### Sampling
+
+Sampling randomly chooses tokens according to their probabilities. High-probability tokens are more likely, but lower-probability tokens can still appear.
+
+Benefit: more variety.
+
+Risk: more nondeterminism and possible drift.
+
+### Temperature
+
+Temperature changes how sharp or flat the probability distribution is.
+
+<EquationBlock title="Temperature-scaled softmax" equation={"P(token_i) = exp(logit_i / temperature) / sum_j exp(logit_j / temperature)"}>
+`temperature` is a positive number. Lower temperature makes high-scoring tokens dominate more. Higher temperature gives lower-scoring tokens more chance. `token_i`, `logit_i`, `exp`, and `sum_j` have the same meanings as before.
+</EquationBlock>
+
+Professional rule of thumb:
+
+- Lower temperature is better for extraction, classification, and format-sensitive tasks.
+- Higher temperature can help brainstorming, creative writing, and diverse alternatives.
+- Temperature does not make a model more factual by itself.
+
+### Top-k sampling
+
+Top-k sampling keeps only the `k` most likely tokens, then samples from those.
+
+If `k = 50`, the model ignores every token outside the top 50 for that step.
+
+### Top-p sampling
+
+Top-p sampling, also called nucleus sampling, keeps the smallest set of tokens whose cumulative probability reaches a threshold `p`.
+
+If `p = 0.9`, the model keeps enough likely tokens to cover 90 percent of the probability mass, then samples from that set.
+
+### Beam search
+
+Beam search keeps several likely partial sequences at once and extends them over multiple steps. It is common in translation and some structured generation tasks, but it is not always best for open-ended assistant answers.
+
+Hugging Face's generation documentation is useful here because it treats decoding as a configurable generation strategy rather than a hidden model property.
+
+<CheckUnderstanding prompt="What is the difference between the model and the decoder?">
+The model produces next-token scores or probabilities. The decoder is the rule that turns those probabilities into actual selected tokens. Changing decoding settings can change outputs even when the model weights are unchanged.
+</CheckUnderstanding>
+
+## Section 6: Context windows are working memory, not permanent memory
+
+A <GlossaryTerm term="context window">the maximum number of tokens a model can consider in one request, including prompt, conversation history, tool results, retrieved documents, hidden system/developer instructions, and generated output.</GlossaryTerm>
+
+The context window is not the same as the model's training data. Training changes the model's parameters. Context is temporary input for the current request.
+
+This distinction matters:
+
+- If information is in the model's parameters, the model may be able to use it without seeing it in the prompt, but it may be outdated or wrong.
+- If information is in the context, the model can condition on it directly, but only while it fits in the request.
+- If information is in neither parameters nor context, the model cannot reliably know it.
+
+<ConceptDiagram type="complexity" />
+
+Professional context: context is a budget. In retrieval-augmented generation, engineers decide which documents to retrieve, how to chunk them, how much chat history to keep, and how much room to reserve for the answer. OpenAI's prompt engineering documentation describes planning for context windows because models can only handle a limited amount of data in one generation request.
+
+Common context failures:
+
+- Too much irrelevant text crowds out the useful evidence.
+- The answer budget is too small, so generation truncates.
+- Important instructions appear early in a long context and are not followed reliably.
+- Retrieved documents conflict with each other.
+- Chat history contains stale assumptions.
+
+<Quiz
+  question="What is the context window?"
+  options={[
+    "The token budget the model can consider during one request.",
+    "The complete internet.",
+    "The permanent memory created by every previous conversation.",
+  ]}
+  correctIndex={0}
+  explanation="Context is temporary input for the current request. It is limited by token budget."
+/>
+
+## Section 7: Prompting is programming the context
+
+A <GlossaryTerm term="prompt">the input instructions, examples, data, and conversation messages given to the model.</GlossaryTerm>
+
+Prompting works because the prompt changes the token context for next-token prediction. If the prompt includes a task description, examples, constraints, or relevant documents, the model conditions its next-token probabilities on that information.
+
+OpenAI's prompting documentation describes few-shot learning as steering a model with examples in the prompt rather than changing the model's weights. GPT-3 made this idea famous at scale: the paper evaluated zero-shot, one-shot, and few-shot settings.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>What the prompt contains</th>
+        <th>Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Zero-shot</td>
+        <td>Instruction only</td>
+        <td>Classify this review as Positive, Neutral, or Negative.</td>
+      </tr>
+      <tr>
+        <td>One-shot</td>
+        <td>One example plus the new input</td>
+        <td>One labeled review, then a new review to classify.</td>
+      </tr>
+      <tr>
+        <td>Few-shot</td>
+        <td>Several examples plus the new input</td>
+        <td>Several labeled reviews showing edge cases.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Professional prompting is not only clever wording. It includes:
+
+- Clear task framing.
+- Relevant context.
+- Output format constraints.
+- Examples that cover edge cases.
+- Separation between trusted instructions and untrusted user content.
+- Evals that measure whether the prompt works over many cases.
+
+## Section 8: Instruction tuning turns continuation models into assistants
+
+A base language model is trained to continue text. If you ask it a question, it may answer, but it may also continue the pattern in an unhelpful way.
+
+Instruction tuning changes this. In <GlossaryTerm term="instruction tuning">additional training that teaches a model to follow natural-language instructions.</GlossaryTerm>, the model sees examples of instructions and desired responses.
+
+The InstructGPT paper goes further by using human feedback:
+
+1. Collect demonstrations of desired behavior and train a supervised model.
+2. Collect human rankings of model outputs and train a reward model.
+3. Optimize the model against the reward model using reinforcement learning from human feedback.
+
+<EquationBlock title="Instruction tuning as behavior shaping" equation={"base model -> supervised instruction tuning -> preference optimization -> assistant behavior"}>
+This is a conceptual pipeline, not one universal recipe. Different model providers and open-source projects use different post-training methods.
+</EquationBlock>
+
+The InstructGPT result is important because a smaller instruction-following model was preferred by human evaluators over a much larger base GPT-3 model on the evaluated prompt distribution. The professional lesson is clear: model quality is not just parameter count. Training objective, data, human preference signals, safety work, and evaluation target all matter.
+
+<CheckUnderstanding prompt="Why might a smaller instruction-tuned model feel more useful than a larger base model?">
+Because the smaller model may be trained to follow user instructions, refuse unsafe requests, and produce helpful formats, while the larger base model may mainly be trained to continue text. Usefulness depends on post-training and evaluation, not only size.
+</CheckUnderstanding>
+
+## Section 9: What LLMs know, and what they do not know
+
+An LLM's parameters can store many patterns learned during training, including factual associations. But that does not make the model a reliable source of truth.
+
+Reasons:
+
+- Training data may contain errors.
+- Training data may be outdated.
+- The model may blend incompatible patterns.
+- The prompt may ask for something outside the model's knowledge.
+- Decoding may sample a plausible but false continuation.
+- The model may not have access to private or recent information unless the system provides it.
+
+A <GlossaryTerm term="hallucination">a fluent output that is unsupported, fabricated, or inconsistent with the available evidence.</GlossaryTerm>
+
+"Hallucination" is not one bug with one fix. It can come from missing retrieval, weak prompts, poor source ranking, ambiguous tasks, overconfident decoding, insufficient evaluation, or model limitations.
+
+Professional response: do not merely tell the model "be accurate." Build systems that ground outputs in sources, test claims, constrain formats, show uncertainty, route risky tasks to human review, and measure failures.
+
+## Section 10: Evaluation is how engineers stop guessing
+
+An <GlossaryTerm term="evaluation">a test process that measures whether model behavior meets requirements.</GlossaryTerm> Evaluation can be automatic, human-reviewed, or both.
+
+Useful evaluation asks a specific question:
+
+- Does the answer cite the right source?
+- Does the model obey the requested JSON schema?
+- Does it refuse unsafe requests?
+- Does it preserve facts from the input document?
+- Does it solve the task within latency and cost limits?
+- Does a new prompt or model version regress on old examples?
+
+The OpenAI text generation docs recommend building evals to monitor prompt performance when prompts or model versions change. That advice matters because prompt behavior can shift across models, snapshots, decoding settings, and context changes.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Evaluation type</th>
+        <th>What it catches</th>
+        <th>What it can miss</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Golden examples</td>
+        <td>Known inputs with expected outputs or rubrics.</td>
+        <td>New edge cases outside the test set.</td>
+      </tr>
+      <tr>
+        <td>Schema checks</td>
+        <td>Broken JSON, missing fields, invalid labels.</td>
+        <td>Whether the content is true or useful.</td>
+      </tr>
+      <tr>
+        <td>Source-grounding checks</td>
+        <td>Unsupported claims relative to retrieved evidence.</td>
+        <td>Cases where the source itself is wrong.</td>
+      </tr>
+      <tr>
+        <td>Human review</td>
+        <td>Nuanced quality, safety, and usefulness.</td>
+        <td>Scale, consistency, and speed.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 11: Scaling laws and the professional cost question
+
+Scaling laws study how model performance changes as model size, data size, and compute change. Kaplan et al. found that language modeling loss followed predictable power-law trends across model size, dataset size, and compute in their experiments.
+
+Later, the Chinchilla paper argued that many large language models were undertrained for their compute budget and that compute-optimal training required balancing model parameters and training tokens differently. The practical takeaway is not "always use the biggest model." The takeaway is that quality, training cost, inference cost, data quality, and deployment volume are linked.
+
+Professional tradeoffs:
+
+- Bigger models may be more capable, but cost more per request.
+- Smaller models may be faster and cheaper, especially if well tuned for a narrow task.
+- Long prompts increase latency and cost.
+- Retrieval can improve factuality, but adds system complexity.
+- Fine-tuning can improve stable behavior, but requires data and evaluation.
+- Decoding settings can improve style, but cannot compensate for missing evidence.
+
+## Common misconceptions
+
+Misconception: "An LLM searches the internet when it answers."
+
+Better view: a model only uses its parameters and current context unless the system gives it a browsing, retrieval, or tool-use capability.
+
+Misconception: "Temperature controls intelligence."
+
+Better view: temperature controls randomness in token selection. It does not add knowledge or reasoning ability.
+
+Misconception: "A longer prompt is always better."
+
+Better view: relevant context helps. Irrelevant context wastes tokens, increases cost, and can distract the model.
+
+Misconception: "Few-shot examples train the model."
+
+Better view: few-shot prompting changes the current context. It does not update model weights.
+
+Misconception: "Bigger models are always better for production."
+
+Better view: the best production choice depends on accuracy, latency, cost, reliability, data sensitivity, evaluation results, and maintenance burden.
+
+## Production failure modes to watch for
+
+- Hallucinated facts: fluent claims appear without support.
+- Prompt sensitivity: small wording changes cause large behavior changes.
+- Context overflow: important information is truncated or crowded out.
+- Instruction conflict: system, developer, user, retrieved, or tool content disagree.
+- Prompt injection: untrusted content tries to override trusted instructions.
+- Nondeterminism: sampling produces inconsistent outputs across runs.
+- Format drift: the model stops following required output structure.
+- Evaluation mismatch: offline benchmarks improve, but user-facing quality does not.
+- Stale knowledge: the model answers from old training patterns instead of current facts.
+- Cost surprises: prompt length, output length, retries, or model choice make the feature expensive.
+
+## Interview-ready summary
+
+A large language model is a trained neural network that assigns probabilities to token sequences. Modern GPT-style models usually generate autoregressively: they read the prompt, predict next-token probabilities, choose a token through a decoding strategy, append it, and repeat. Tokenization determines what the model actually sees and how context budget is spent. Pretraining teaches broad continuation patterns; instruction tuning and human feedback make models better at following user intent. Prompts steer behavior by changing the context, while decoding settings control how probabilities become text. In production, engineers evaluate model behavior, manage context, ground answers when needed, and reason about failures such as hallucination, prompt sensitivity, nondeterminism, and cost.
+
+<CheckUnderstanding prompt="Explain why an LLM can be useful and still unreliable.">
+It can learn many useful language, coding, factual, and task patterns from pretraining and post-training, so it can produce helpful outputs. But it predicts likely continuations rather than verifying truth by default, so it can produce fluent unsupported claims, follow misleading context, or fail when information is missing, stale, or ambiguous.
+</CheckUnderstanding>
+
+## Practice: trace one generated answer
+
+Use the prompt:
+
+> "Explain what a context window is in one sentence."
+
+Trace the generation:
+
+1. The tokenizer converts the prompt into token IDs.
+2. The model embeds those token IDs as vectors.
+3. The Transformer processes the context using masked attention.
+4. The output layer produces logits for the next token.
+5. Softmax converts logits into probabilities.
+6. The decoder chooses a token, perhaps "A".
+7. The token is appended to the context.
+8. The model predicts the next token conditioned on the prompt plus "A".
+9. The loop continues until the model emits a stop signal or reaches a token limit.
+
+<Quiz
+  question="When a generated answer is already halfway complete, what is the model predicting next?"
+  options={[
+    "The next token conditioned on the prompt and the tokens already generated.",
+    "The entire final answer from scratch with no previous tokens.",
+    "A permanent update to its training data.",
+  ]}
+  correctIndex={0}
+  explanation="Autoregressive generation keeps appending tokens. Each next prediction sees the previous generated tokens as part of the current context."
+/>
+
+## Practice: choose a decoding strategy
+
+Match the task to a reasonable first decoding choice:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Task</th>
+        <th>Good first choice</th>
+        <th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Extract invoice totals into JSON.</td>
+        <td>Low temperature.</td>
+        <td>The task needs consistency and structure, not creativity.</td>
+      </tr>
+      <tr>
+        <td>Brainstorm ten product names.</td>
+        <td>Moderate sampling.</td>
+        <td>The task benefits from variety.</td>
+      </tr>
+      <tr>
+        <td>Translate a sentence with strict wording constraints.</td>
+        <td>Greedy or beam search experiment.</td>
+        <td>The task rewards preserving meaning and avoiding random drift.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Final mastery checklist
+
+You are ready to continue when you can:
+
+- Explain why LLM generation is a repeated next-token process.
+- Distinguish tokens from words.
+- Define context window and explain why it affects cost and reliability.
+- Read the negative log likelihood objective and explain each symbol.
+- Explain how temperature changes sampling.
+- Compare zero-shot, one-shot, and few-shot prompting.
+- Distinguish base models from instruction-tuned assistant models.
+- Name at least five production failure modes.
+- Propose a simple eval for a prompt-based AI feature.
+
+## Sources
+
+<SourceCitation label="Brown et al., Language Models are Few-Shot Learners" href="https://arxiv.org/abs/2005.14165" />
+
+<SourceCitation label="Ouyang et al., Training language models to follow instructions with human feedback" href="https://arxiv.org/abs/2203.02155" />
+
+<SourceCitation label="Kaplan et al., Scaling Laws for Neural Language Models" href="https://arxiv.org/abs/2001.08361" />
+
+<SourceCitation label="Hoffmann et al., Training Compute-Optimal Large Language Models" href="https://arxiv.org/abs/2203.15556" />
+
+<SourceCitation label="Sennrich et al., Neural Machine Translation of Rare Words with Subword Units" href="https://arxiv.org/abs/1508.07909" />
+
+<SourceCitation label="OpenAI text generation guide" href="https://platform.openai.com/docs/guides/text" />
+
+<SourceCitation label="OpenAI prompt engineering guide" href="https://platform.openai.com/docs/guides/prompt-engineering" />
+
+<SourceCitation label="OpenAI tiktoken repository" href="https://github.com/openai/tiktoken" />
+
+<SourceCitation label="Hugging Face Transformers generation strategies" href="https://huggingface.co/docs/transformers/v4.44.1/generation_strategies" />

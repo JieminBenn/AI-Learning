@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { attentionLesson, topics } from "@/data/curriculum";
+import { attentionLesson, llmFoundationsLesson, topics } from "@/data/curriculum";
 
 const baseUrl = "https://ai-learning-tau-steel.vercel.app";
 
@@ -21,6 +21,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${baseUrl}/lessons/${attentionLesson.slug}`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/lessons/${llmFoundationsLesson.slug}`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.9,
