@@ -1,0 +1,478 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson teaches data pipelines for AI systems. A data pipeline is the repeatable path data follows from raw source to useful artifact: retrieval index, training dataset, fine-tuning file, evaluation set, monitoring table, or feedback loop.
+
+You do not need to know databases, distributed systems, or machine learning operations before starting. You do need one mental model:
+
+Models learn from data, retrieve from data, evaluate against data, and fail because of data. A pipeline is how professionals make that data traceable, testable, repeatable, and safe enough to depend on.
+
+We will move from intuition to professional practice:
+
+1. Why AI systems need data pipelines.
+2. What raw data, datasets, artifacts, schemas, and lineage mean.
+3. How ingestion, cleaning, transformation, validation, versioning, and publishing fit together.
+4. How pipelines differ for RAG, fine-tuning, evaluation, and monitoring.
+5. How engineers detect leakage, drift, stale data, label noise, and broken transformations.
+6. How to design a small pipeline that a beginner can still reason about end to end.
+
+## Explain it in 5 minutes
+
+A <GlossaryTerm term="data pipeline">a repeatable workflow that moves data through steps such as collection, cleaning, validation, transformation, storage, and use.</GlossaryTerm> In AI engineering, the output of a pipeline is often not a webpage or report. It is something an AI system depends on: chunks for retrieval, examples for fine-tuning, labels for evaluation, logs for monitoring, or features for model training.
+
+Imagine a support assistant that answers questions from product documentation. The raw source is a documentation site. The AI-ready artifact is a searchable index of clean document chunks with titles, URLs, permissions, timestamps, embeddings, and quality checks.
+
+<ConceptDiagram type="dataPipeline" />
+
+The pipeline might do this:
+
+1. Fetch pages from the documentation site.
+2. Remove navigation, duplicate footers, broken markup, and outdated pages.
+3. Split each page into chunks.
+4. Attach metadata such as product, version, URL, and access rules.
+5. Validate that required fields exist and values have expected types.
+6. Embed chunks and publish them to a vector index.
+7. Record which source snapshot, code version, model version, and validation results produced the index.
+
+Without this pipeline, the assistant might retrieve stale policies, leak private documents, cite missing URLs, or silently mix old and new data.
+
+<CheckUnderstanding prompt="What is the main purpose of an AI data pipeline?">
+An AI data pipeline turns raw, changing, messy data into validated, versioned, usable artifacts for retrieval, training, fine-tuning, evaluation, or monitoring.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define pipeline, raw data, dataset, artifact, schema, validation, transformation, batch pipeline, streaming pipeline, extract-transform-load, extract-load-transform, lineage, data versioning, label noise, data leakage, drift, and feedback loop.
+- Trace how source data becomes a retrieval index, fine-tuning dataset, evaluation set, or monitoring signal.
+- Explain why validation checks should run before data reaches model training or user-facing retrieval.
+- Read simple data quality equations and explain every symbol.
+- Design beginner-friendly schema checks for text, labels, metadata, and split membership.
+- Diagnose common production failures such as stale indexes, schema drift, duplicate examples, label leakage, privacy leakage, and broken joins.
+- Explain why professional AI teams document datasets and pipeline decisions.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- <GlossaryTerm term="Data">recorded information.</GlossaryTerm> In AI systems this can include text, images, labels, logs, documents, tool traces, user feedback, embeddings, or model outputs.
+- A <GlossaryTerm term="dataset">a collection of data examples prepared for a specific use.</GlossaryTerm> A training dataset teaches a model. An evaluation dataset tests behavior. A retrieval corpus is searched for evidence.
+- An <GlossaryTerm term="artifact">a saved output produced by a pipeline step.</GlossaryTerm> Examples: a cleaned table, a JSONL file, a chunk index, an embedding file, or a validation report.
+- A <GlossaryTerm term="schema">a description of what fields the data should contain and what type or range each field should have.</GlossaryTerm>
+- A <GlossaryTerm term="model">a system with learned or configured behavior that maps inputs to outputs.</GlossaryTerm>
+- <GlossaryTerm term="Production">the environment where real users, real data, or real business decisions depend on the system.</GlossaryTerm>
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Pipeline</td>
+        <td>A repeatable sequence of data steps.</td>
+        <td>The operational contract that turns source data into AI-ready artifacts with checks, ownership, and observability.</td>
+      </tr>
+      <tr>
+        <td>Schema</td>
+        <td>A rulebook for the shape of data.</td>
+        <td>Used to catch missing fields, wrong types, unexpected values, and source changes before downstream systems break.</td>
+      </tr>
+      <tr>
+        <td>Lineage</td>
+        <td>A record of where data came from.</td>
+        <td>Connects an artifact to source snapshots, code versions, model versions, transformations, and validation results.</td>
+      </tr>
+      <tr>
+        <td>Validation</td>
+        <td>Checking that data meets expectations.</td>
+        <td>A gate that prevents bad data from reaching retrieval, training, evaluation, or dashboards.</td>
+      </tr>
+      <tr>
+        <td>Data leakage</td>
+        <td>When information appears where it should not.</td>
+        <td>A serious evaluation bug, often caused by training on test examples, future information, private data, or answer labels hidden in inputs.</td>
+      </tr>
+      <tr>
+        <td>Drift</td>
+        <td>When data changes over time.</td>
+        <td>Can make a model, retriever, label rule, or monitoring threshold less reliable than it was during development.</td>
+      </tr>
+      <tr>
+        <td>Feedback loop</td>
+        <td>New system behavior affects future data.</td>
+        <td>Can improve systems through review signals, or damage them when unverified model outputs become future training data.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: Why data pipelines matter in AI
+
+In many software systems, bad data causes wrong reports or failed jobs. In AI systems, bad data can silently change model behavior.
+
+The TFX paper describes production machine learning as an orchestration problem: systems need components for data analysis, data validation, transformation, training, model analysis, and serving. The paper's practical warning is that ad hoc scripts and glue code become fragile as data changes over time.
+
+<SourceCitation label="Baylor et al., TFX: A TensorFlow-Based Production-Scale Machine Learning Platform" href="https://research.google/pubs/tfx-a-tensorflow-based-production-scale-machine-learning-platform/" />
+
+For a beginner, the key idea is simpler than the platform: the model is only one part of the system. The data path around the model decides what the model sees, what retrieval can find, what evaluation measures, and what monitoring notices.
+
+Professional examples:
+
+- A RAG assistant with stale document chunks gives outdated answers even if the language model is excellent.
+- A fine-tuned model trained on inconsistent labels learns inconsistent behavior.
+- An evaluation set contaminated with training examples makes the model look better than it is.
+- A monitoring dashboard built from incomplete logs hides a real production failure.
+
+## Section 2: The pipeline contract
+
+A useful data pipeline is more than "run this script." It should answer six questions.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Question</th>
+        <th>Beginner version</th>
+        <th>Professional reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Source</td>
+        <td>Where did the data come from?</td>
+        <td>Source ownership, freshness, permission, and trust determine whether the artifact is usable.</td>
+      </tr>
+      <tr>
+        <td>Shape</td>
+        <td>What fields should exist?</td>
+        <td>Schemas catch breaking changes before training, retrieval, or evaluation consume them.</td>
+      </tr>
+      <tr>
+        <td>Transformation</td>
+        <td>What changed between raw and final data?</td>
+        <td>Cleaning, parsing, filtering, joins, chunking, and labeling can introduce hidden bugs.</td>
+      </tr>
+      <tr>
+        <td>Quality</td>
+        <td>How do we know the data is good enough?</td>
+        <td>Validation checks turn vague trust into measurable gates.</td>
+      </tr>
+      <tr>
+        <td>Version</td>
+        <td>Which exact data produced this result?</td>
+        <td>Reproducibility requires data snapshot, code version, configuration, and model version.</td>
+      </tr>
+      <tr>
+        <td>Use</td>
+        <td>What is this dataset allowed to be used for?</td>
+        <td>Datasets may be appropriate for evaluation, retrieval, or analysis, but unsafe for training or release.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Gebru et al. proposed datasheets for datasets because dataset creators and users often lack standardized documentation about motivation, composition, collection, recommended uses, and limitations. In professional AI work, documentation is not paperwork for its own sake. It prevents a future engineer from treating a dataset as more complete, current, fair, private, or representative than it really is.
+
+<SourceCitation label="Gebru et al., Datasheets for Datasets" href="https://arxiv.org/abs/1803.09010" />
+
+## Section 3: Batch, streaming, ETL, and ELT
+
+A <GlossaryTerm term="batch pipeline">a pipeline that processes a collection of data on a schedule or trigger.</GlossaryTerm> Example: rebuild a documentation index every night.
+
+A <GlossaryTerm term="streaming pipeline">a pipeline that processes events continuously as they arrive.</GlossaryTerm> Example: record user feedback events from an AI assistant in near real time.
+
+Both styles matter in AI.
+
+Batch pipelines are easier to reason about because each run has a clear input snapshot and output artifact. They are common for training datasets, evaluation sets, scheduled index rebuilds, and offline analysis.
+
+Streaming pipelines are useful when freshness matters. They are common for telemetry, monitoring, abuse detection, and online feedback collection. They are harder because late events, duplicates, retries, and partial failures must be handled carefully.
+
+You may also hear two database terms:
+
+- <GlossaryTerm term="ETL">extract, transform, load: pull data from a source, transform it, then load the final result into storage.</GlossaryTerm>
+- <GlossaryTerm term="ELT">extract, load, transform: pull data from a source, load it into storage, then transform it there.</GlossaryTerm>
+
+For AI beginners, the important point is not which acronym is fashionable. The important point is where transformations happen, how they are tested, and whether the final artifact can be reproduced.
+
+## Section 4: Validation turns assumptions into checks
+
+Every pipeline has assumptions. Validation makes them explicit.
+
+Suppose each evaluation example should contain:
+
+- `id`: a stable string.
+- `question`: non-empty text.
+- `expected_answer`: non-empty text.
+- `source_url`: a valid source link.
+- `split`: one of `train`, `validation`, or `test`.
+
+A schema check can catch missing fields. A range check can catch impossible numbers. A uniqueness check can catch duplicate IDs. A split check can catch examples appearing in both training and test sets.
+
+TensorFlow Data Validation was designed for analyzing and validating machine learning data in continuous pipelines. Its documentation emphasizes scalable summary statistics, schema generation, anomaly detection, and checks for issues such as missing values, out-of-range values, and wrong feature types.
+
+<SourceCitation label="TensorFlow Data Validation documentation" href="https://www.tensorflow.org/tfx/data_validation/install" />
+
+One simple quality metric is missingness:
+
+<EquationBlock title="Missing value rate" equation={"missing_rate(field) = missing_count(field) / total_count"}>
+`field` is the column or attribute being checked. `missing_count(field)` is how many records do not have a usable value for that field. `total_count` is the number of records inspected. A high missing rate can mean the source changed, parsing failed, or the field was never reliably collected.
+</EquationBlock>
+
+Another useful check is duplicate rate:
+
+<EquationBlock title="Duplicate rate" equation={"duplicate_rate = duplicate_records / total_records"}>
+`duplicate_records` is the number of records that repeat an ID, text, or other chosen identity. `total_records` is the number of records in the dataset. Duplicates can overweight examples during training and can make evaluation look more stable than it really is.
+</EquationBlock>
+
+Here is a tiny validation example:
+
+```ts
+type EvalExample = {
+  id: string;
+  question: string;
+  expected_answer: string;
+  source_url: string;
+  split: "train" | "validation" | "test";
+};
+
+function validateEvalExample(example: EvalExample) {
+  const errors: string[] = [];
+
+  if (!example.id.trim()) errors.push("id is required");
+  if (!example.question.trim()) errors.push("question is required");
+  if (!example.expected_answer.trim()) errors.push("expected_answer is required");
+  if (!example.source_url.startsWith("https://")) errors.push("source_url must be an HTTPS URL");
+
+  return errors;
+}
+```
+
+This code is intentionally small. Production validation would also check duplicates across the whole dataset, source permissions, token length, label format, personally identifiable information, and split leakage.
+
+<Quiz
+  question="Why should validation happen before data reaches a model or retrieval index?"
+  options={[
+    "Because bad data can silently change model behavior, retrieval quality, evaluation results, or monitoring signals.",
+    "Because validation guarantees that the model will be truthful.",
+    "Because validation removes the need for human review.",
+  ]}
+  correctIndex={0}
+  explanation="Validation catches data problems early, but it does not guarantee truthful generation or replace review for high-risk systems."
+/>
+
+## Section 5: Lineage and versioning make results reproducible
+
+<GlossaryTerm term="Lineage">the record of how an artifact was produced from earlier data, code, configuration, and model versions.</GlossaryTerm>
+
+If a model suddenly performs worse, you need to know what changed. Was it the prompt? The model? The retrieval index? The chunking code? The source documents? The embedding model? The evaluation labels?
+
+A professional pipeline should record:
+
+- Source snapshot identifier.
+- Pipeline code version.
+- Configuration values, such as chunk size or filters.
+- Model versions used for embeddings, labeling, or generation.
+- Validation results.
+- Output artifact location.
+- Run time and owner.
+
+In TFX, metadata is a first-class part of pipeline operation. The open-source TFX project describes metadata as a backend that records component runs, input and output artifacts, and runtime configuration. The general lesson transfers beyond TFX: if you cannot connect an output to its inputs, debugging becomes guesswork.
+
+<SourceCitation label="TensorFlow Extended GitHub repository" href="https://github.com/tensorflow/tfx" />
+
+## Section 6: Pipelines for RAG
+
+A RAG data pipeline prepares a retrieval corpus.
+
+The source might be product docs, internal runbooks, contracts, research papers, or support articles. The output is usually an index containing chunks, embeddings, text, metadata, and permissions.
+
+Key checks:
+
+- Every chunk has a source URL or document ID.
+- Every chunk has permission metadata.
+- Every chunk belongs to the correct product, tenant, or version.
+- Chunk text is not empty, duplicated, or mostly boilerplate.
+- Embedding model version is recorded.
+- Old chunks are removed when source documents are deleted or replaced.
+
+Professional failure mode: stale indexes. A company updates a policy page, but the retrieval index still contains last month's page. The model may answer with confidence because the retrieved evidence looks authoritative. The root cause is not the language model. It is the data pipeline's freshness and invalidation logic.
+
+<CheckUnderstanding prompt="Why does RAG need pipeline metadata?">
+Because the system must know which source, version, permissions, chunking code, and embedding model produced each searchable chunk.
+</CheckUnderstanding>
+
+## Section 7: Pipelines for fine-tuning
+
+A fine-tuning data pipeline prepares examples that teach stable behavior. For instruction-tuned language models, an example often contains a user message and an ideal assistant response.
+
+Key checks:
+
+- Examples match the required file format.
+- Labels or ideal responses are consistent.
+- Sensitive information is removed or approved for training.
+- Duplicate examples are controlled.
+- Train, validation, and test splits do not overlap.
+- The evaluation set represents the behavior you care about.
+
+Data leakage is especially dangerous here. If the same example appears in both training and evaluation, the model may appear to generalize when it is partly memorizing.
+
+<EquationBlock title="Split overlap check" equation={"overlap_rate = count(train_ids intersect test_ids) / count(test_ids)"}>
+`train_ids` is the set of example identifiers in training data. `test_ids` is the set of identifiers in test data. `intersect` means examples that appear in both sets. A healthy evaluation split should usually have an overlap rate of 0.
+</EquationBlock>
+
+Professional failure mode: label noise. If one annotator says a terse answer is ideal and another says the same style is unacceptable, the model receives conflicting training signals. The fix is not only more data. The team may need clearer labeling guidelines, adjudication, and evaluation slices.
+
+## Section 8: Pipelines for evaluation and monitoring
+
+Evaluation data answers: "Is the system good enough before release?"
+
+Monitoring data answers: "Is the system still behaving well after release?"
+
+An evaluation pipeline may collect examples, freeze a dataset version, run the AI system, score outputs, and compare results across model or prompt versions.
+
+A monitoring pipeline may collect production traces, latency, cost, retrieval results, user feedback, error categories, safety flags, and human review decisions.
+
+These pipelines should be separated from training data unless there is a careful review process. If every model answer becomes future training data automatically, the system can learn from its own mistakes. That is a feedback loop with a very sharp edge.
+
+Data Cascades in High-Stakes AI reports that data issues can compound through AI development and deployment, especially when data work is undervalued. For professional engineers, this is a warning against treating dataset cleanup as a one-time chore. Data quality is a system property that needs ownership.
+
+<SourceCitation label="Sambasivan et al., Data Cascades in High-Stakes AI" href="https://research.google/pubs/everyone-wants-to-do-the-model-work-not-the-data-work-data-cascades-in-high-stakes-ai/" />
+
+## Builder lab: Make a first AI data pipeline in VS Code
+
+Use this lab after you understand validation, lineage, and the difference between raw data and AI-ready artifacts. The goal is to build a small repeatable pipeline that fails loudly when data is bad.
+
+Recommended beginner toolchain:
+
+- VS Code as the editor.
+- Node.js with TypeScript, or Python if you prefer Python.
+- A `raw/` folder with a few Markdown or JSON files.
+- A `data/processed/` folder for generated artifacts.
+- A validation script that exits with an error when required checks fail.
+
+Start with these files:
+
+```text
+ai-data-pipeline-demo/
+  raw/
+    refunds.md
+    billing-errors.md
+  data/
+    processed/
+  src/
+    ingest.ts
+    clean.ts
+    validate.ts
+    publish.ts
+    lineage.ts
+  package.json
+```
+
+Build it in this order:
+
+1. `ingest.ts` reads source files and records stable IDs, paths, titles, timestamps, and raw text.
+2. `clean.ts` removes boilerplate, normalizes whitespace, and creates candidate chunks or examples.
+3. `validate.ts` checks required fields, empty text, duplicate IDs, token length, source URL/path, and allowed split names.
+4. `lineage.ts` writes a small manifest with source file names, pipeline version, timestamp, validation summary, and output location.
+5. `publish.ts` copies only validated artifacts into the folder that a RAG, fine-tuning, or evaluation workflow will read.
+
+Great Expectations and TensorFlow Data Validation are useful because they make data assumptions executable. Dagster is useful when the pipeline grows and you need scheduled runs, asset lineage, retries, and observability. Start with scripts so the beginner can see the data path; adopt orchestration when repetition, ownership, or scale demands it.
+
+<SourceCitation label="Great Expectations data validation documentation" href="https://docs.greatexpectations.io/docs/guides/validation/validate_data_overview/" />
+<SourceCitation label="Dagster documentation" href="https://docs.dagster.io/" />
+
+## Section 9: Common misconceptions
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Misconception</th>
+        <th>Correction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>"A pipeline is just a script."</td>
+        <td>A script can be one implementation detail. A pipeline also needs inputs, outputs, validation, ownership, versioning, and recovery behavior.</td>
+      </tr>
+      <tr>
+        <td>"More data is always better."</td>
+        <td>More low-quality, duplicated, stale, biased, or mislabeled data can make systems worse.</td>
+      </tr>
+      <tr>
+        <td>"Validation is only for structured tables."</td>
+        <td>Text pipelines also need validation: empty content, token length, language, duplicates, URLs, permissions, source dates, and format checks.</td>
+      </tr>
+      <tr>
+        <td>"If the model is strong, the data pipeline matters less."</td>
+        <td>Strong models still depend on the evidence, examples, labels, and logs they receive.</td>
+      </tr>
+      <tr>
+        <td>"Evaluation data can be updated casually."</td>
+        <td>Changing an evaluation set changes the measuring instrument. Version it like a serious artifact.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 10: Practice checks
+
+1. You rebuild a RAG index every night. Yesterday's deleted pages still appear in answers. Which pipeline step should you inspect first?
+
+   Look at source snapshotting, deletion handling, and index publishing. The pipeline may add new chunks without removing old chunks.
+
+2. A fine-tuned assistant scores 98% on evaluation but fails on new customer examples. What data issue might explain this?
+
+   The evaluation set may overlap with training data, be too easy, be too small, or fail to represent production inputs.
+
+3. A monitoring dashboard shows no safety incidents, but reviewers are reporting unsafe outputs. What should you check?
+
+   Check whether all production events are logged, whether review decisions join to the correct trace IDs, whether filters hide failures, and whether the dashboard schema changed.
+
+4. A documentation pipeline suddenly produces half as many chunks. What validation checks could catch this before publishing?
+
+   Check document count, chunk count, empty text rate, parse error rate, source status codes, and distribution changes by product or section.
+
+## Implementation resources
+
+- TFX is an end-to-end machine learning pipeline platform with components for examples, statistics, schema, transformation, training, evaluation, model validation, serving, and metadata.
+- TensorFlow Data Validation is useful for learning schema generation, anomaly detection, and summary-statistics-based checks.
+- Dataset documentation practices from Datasheets for Datasets are useful even when your project does not use a formal datasheet template.
+- For RAG pipelines, inspect maintained examples from model providers and vector database vendors, but always add your own validation, versioning, and permission checks.
+
+<div className="source-list">
+  <SourceCitation label="TensorFlow Extended GitHub repository" href="https://github.com/tensorflow/tfx" />
+  <SourceCitation label="TensorFlow Data Validation documentation" href="https://www.tensorflow.org/tfx/data_validation/install" />
+  <SourceCitation label="Great Expectations data validation documentation" href="https://docs.greatexpectations.io/docs/guides/validation/validate_data_overview/" />
+  <SourceCitation label="Dagster documentation" href="https://docs.dagster.io/" />
+  <SourceCitation label="Datasheets for Datasets" href="https://arxiv.org/abs/1803.09010" />
+</div>
+
+## Final mental model
+
+An AI data pipeline is the system that decides what data the AI system is allowed to know, learn from, retrieve, be judged by, and report about itself.
+
+The professional habit is to ask:
+
+- What exact data produced this artifact?
+- What checks passed before it was published?
+- What changed since the last good run?
+- What data should never enter this path?
+- What failure would users see if this pipeline silently broke?
+
+If you can answer those questions, you are no longer treating data as background material. You are treating it as production infrastructure.

@@ -9,6 +9,7 @@ type ConceptDiagramProps = {
     | "complexity"
     | "positional"
     | "rag"
+    | "dataPipeline"
     | "agent";
 };
 
@@ -242,6 +243,21 @@ export function ConceptDiagram({ type }: ConceptDiagramProps) {
           <div className="diagram-node accent">Retrieve documents</div>
           <div className="diagram-node">Rerank evidence</div>
           <div className="diagram-node output">Answer with citations</div>
+        </div>
+      </figure>
+    );
+  }
+
+  if (type === "dataPipeline") {
+    return (
+      <figure className="concept-diagram data-pipeline-diagram">
+        <figcaption>AI data pipeline loop</figcaption>
+        <div className="diagram-grid compact">
+          <div className="diagram-node input">Source data</div>
+          <div className="diagram-node">Ingest and clean</div>
+          <div className="diagram-node accent">Validate and version</div>
+          <div className="diagram-node">Transform for AI use</div>
+          <div className="diagram-node output">Retrieve, train, evaluate, monitor</div>
         </div>
       </figure>
     );

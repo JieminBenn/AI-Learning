@@ -1,0 +1,608 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson teaches AI agents and tool use from zero. An agent is not magic autonomy. It is a system that gives a model a goal, a controlled set of actions, a way to observe results, and rules for when to continue or stop.
+
+We will move from intuition to professional implementation:
+
+1. Why plain chat is not enough for many AI applications.
+2. What a tool is and how a model requests one.
+3. How an agent loop observes, decides, acts, checks, and stops.
+4. How ReAct connected reasoning with actions.
+5. How Toolformer showed that tool-use behavior can be learned.
+6. How schemas, permissions, tracing, memory, and handoffs make agents safer.
+7. How engineers evaluate tool calls and agent workflows.
+8. What breaks in production and how to diagnose it.
+
+## Explain it in 5 minutes
+
+A large language model can generate text, but many real tasks require actions outside text generation. A support assistant may need to look up an order. A research assistant may need to search sources. A coding assistant may need to inspect files and run tests. A scheduling assistant may need to call a calendar API.
+
+A <GlossaryTerm term="tool">a callable function, application programming interface, or service that the AI system is allowed to request.</GlossaryTerm> A tool might be `search_docs`, `get_order_status`, `run_sql_query`, `send_email`, or `create_ticket`.
+
+An <GlossaryTerm term="agent">an AI system that can choose actions, use tools, observe results, and continue through a workflow until it reaches a goal or stop condition.</GlossaryTerm> The model is usually the decision-making part. The application is the part that actually executes tools, checks permissions, stores traces, and enforces safety boundaries.
+
+<ConceptDiagram type="agent" />
+
+The simplest agent loop is:
+
+1. Receive a user goal and current state.
+2. Ask the model what should happen next.
+3. If the model requests a tool, validate the request.
+4. Execute the tool in application code.
+5. Return the tool result to the model.
+6. Continue until the model returns a final answer or a stop rule ends the run.
+
+<EquationBlock title="Agent loop in one line" equation={"next_state = observe(tool(model(goal, state)))"}>
+The model decides an action from the goal and current state. The tool changes or reads the environment. Observation updates the state for the next step.
+</EquationBlock>
+
+If you only remember one professional lesson, remember this: the model may choose a tool, but your software executes the tool. That boundary is where validation, permissions, logging, cost control, retries, and human approval belong.
+
+<CheckUnderstanding prompt="What makes an agent different from a single chat completion?">
+An agent can run a loop: choose actions, call tools, observe results, and decide whether to continue or stop. A single chat completion only returns one model response unless the application adds orchestration.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define agent, tool, function calling, tool schema, argument validation, observation, state, plan, action, stop condition, handoff, memory, guardrail, trace, and human-in-the-loop review.
+- Explain why tool calling separates model decision-making from application-side execution.
+- Trace a user goal through an agent loop step by step.
+- Read a simple tool-selection equation and explain every symbol.
+- Explain the ReAct pattern and why interleaving reasoning with actions helps on multi-step tasks.
+- Explain the Toolformer idea and why it matters for learned tool use.
+- Design a small tool schema and identify what must be validated before execution.
+- Evaluate agent behavior using task success, tool-call accuracy, recovery, latency, cost, and safety metrics.
+- Diagnose common failures such as wrong tool choice, bad arguments, infinite loops, permission leaks, stale observations, and unverified final answers.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- A <GlossaryTerm term="large language model">a model trained to predict and generate token sequences.</GlossaryTerm>
+- A <GlossaryTerm term="prompt">the input text, instructions, examples, context, and tool results given to the model.</GlossaryTerm>
+- An <GlossaryTerm term="application programming interface">a structured way for software systems to request work from each other.</GlossaryTerm> It is often shortened to API.
+- A <GlossaryTerm term="JSON object">a structured data value with named fields, such as `{ "city": "Tokyo" }`.</GlossaryTerm>
+- A <GlossaryTerm term="schema">a specification that describes what fields are allowed, required, and valid.</GlossaryTerm>
+- A <GlossaryTerm term="state">the information the system carries from one step to the next.</GlossaryTerm> For an agent, state may include messages, tool results, files, task status, costs, and errors.
+- A <GlossaryTerm term="permission">a rule about what an actor is allowed to read, write, execute, or change.</GlossaryTerm>
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Tool</td>
+        <td>A function the AI system can ask to use.</td>
+        <td>A typed contract between model output and application-side execution.</td>
+      </tr>
+      <tr>
+        <td>Function calling</td>
+        <td>The model returns a structured request to call a function.</td>
+        <td>A safer interface than asking the model to write unstructured text that code later parses.</td>
+      </tr>
+      <tr>
+        <td>Tool schema</td>
+        <td>The shape of valid tool arguments.</td>
+        <td>The first validation layer for correctness, security, and reliable orchestration.</td>
+      </tr>
+      <tr>
+        <td>Observation</td>
+        <td>The result returned after an action.</td>
+        <td>The evidence the model uses to decide the next step; stale or incomplete observations cause bad plans.</td>
+      </tr>
+      <tr>
+        <td>Stop condition</td>
+        <td>A rule that ends the loop.</td>
+        <td>Prevents runaway cost, repeated actions, unsafe changes, and unclear user experiences.</td>
+      </tr>
+      <tr>
+        <td>Trace</td>
+        <td>A record of what happened.</td>
+        <td>Essential observability for debugging, evaluation, audits, cost attribution, and incident response.</td>
+      </tr>
+      <tr>
+        <td>Guardrail</td>
+        <td>A safety or correctness boundary.</td>
+        <td>Usually implemented outside the model with validators, policies, permission checks, allowlists, and human approvals.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: Why plain chat is not enough
+
+Plain chat is useful when the model only needs to answer from the prompt and its learned behavior. It is weaker when the task requires current data, private data, computation, side effects, or multi-step recovery.
+
+Consider this request:
+
+> "Refund order 8421 if it is eligible under our current policy."
+
+A plain model response is not enough. The system needs to:
+
+1. Check whether the user is allowed to request refunds.
+2. Look up order 8421.
+3. Retrieve the current refund policy.
+4. Compare the order against the policy.
+5. Possibly create the refund.
+6. Record an audit trail.
+7. Explain what happened to the user.
+
+Each step has different risk. Looking up an order is a read action. Creating a refund is a write action with financial consequences. A professional agent design treats those actions differently. It may let the model request a lookup automatically, but require stronger validation or human approval before issuing money.
+
+<Quiz
+  question="Why should a refund tool be treated differently from a policy lookup tool?"
+  options={[
+    "Because the refund changes real-world state and may need stronger permissions, validation, and audit logging.",
+    "Because models cannot produce JSON for refund tools.",
+    "Because lookup tools never fail.",
+  ]}
+  correctIndex={0}
+  explanation="Tools with side effects need stricter controls than read-only tools. The model can request either, but the application must enforce the boundary."
+/>
+
+## Section 2: Tool calling separates choice from execution
+
+In tool calling, the model does not directly run your function. It returns a structured request such as:
+
+```json
+{
+  "tool_name": "get_order_status",
+  "arguments": {
+    "order_id": "8421"
+  }
+}
+```
+
+Your application then decides whether this request is valid. If it passes validation, the application calls the real tool and returns the result to the model.
+
+This separation matters because model output is not a permission system. A model can propose an action that is wrong, risky, malformed, or outside the user's authority. The application must check:
+
+- Is this tool allowed in this workflow?
+- Are all required arguments present?
+- Do argument values match the schema?
+- Is the user allowed to access the requested resource?
+- Is the action read-only or does it change state?
+- Does this action require confirmation?
+- Has the loop exceeded cost, time, or step limits?
+
+OpenAI's function calling documentation describes tool calling as a way for models to interface with external systems through structured arguments. The key engineering interpretation is this: the model selects an intent, and your code remains responsible for execution.
+
+<SourceCitation label="OpenAI function calling guide" href="https://platform.openai.com/docs/guides/function-calling" />
+
+## Section 3: A tool schema is a contract
+
+A <GlossaryTerm term="tool schema">a structured description of a tool's name, purpose, input fields, and valid argument types.</GlossaryTerm> The schema is not just documentation. It is part of the interface the model sees and part of the validation layer your application enforces.
+
+Example tool:
+
+```ts
+const getWeather = {
+  name: "get_weather",
+  description: "Get current weather for a city.",
+  parameters: {
+    type: "object",
+    properties: {
+      city: {
+        type: "string",
+        description: "City and country, such as 'Paris, France'.",
+      },
+      units: {
+        type: "string",
+        enum: ["celsius", "fahrenheit"],
+      },
+    },
+    required: ["city", "units"],
+    additionalProperties: false,
+  },
+};
+```
+
+Beginner explanation:
+
+- `name` tells the model and application which function is being requested.
+- `description` tells the model when the tool is appropriate.
+- `parameters` defines the argument object.
+- `required` lists fields that must be present.
+- `enum` limits a field to known values.
+- `additionalProperties: false` means unexpected fields are rejected.
+
+Professional context: good tool schemas are narrow. A tool named `do_anything` is dangerous because it hides too much authority behind one vague interface. A tool named `get_customer_invoice_pdf` is easier to validate, monitor, test, and restrict.
+
+<CheckUnderstanding prompt="Why is a narrow tool usually safer than a broad tool?">
+A narrow tool has a clearer purpose, smaller permission surface, simpler validation, better logs, and fewer ways for the model to accidentally request the wrong operation.
+</CheckUnderstanding>
+
+## Builder lab: Make a first agent in VS Code
+
+Use this lab after you understand tools and schemas. The goal is to build a tiny agent loop where you can see every decision, tool call, validation error, and final answer.
+
+Recommended beginner toolchain:
+
+- VS Code as the editor.
+- Node.js with TypeScript, or Python if you prefer Python.
+- One model provider SDK.
+- One read-only tool, such as `search_docs`.
+- One test file with user goals and expected tool behavior.
+
+Start with these files:
+
+```text
+agent-demo/
+  data/
+    handbook.md
+  src/
+    tools.ts
+    model.ts
+    agentLoop.ts
+    eval.ts
+  package.json
+```
+
+Build it in this order:
+
+1. `tools.ts` defines one function, its schema, and its validation rules. Start read-only so mistakes cannot change real state.
+2. `model.ts` sends the user goal, current messages, and tool schema to the model.
+3. `agentLoop.ts` runs a maximum of 3 to 5 steps: call model, validate tool request, execute tool, append observation, or return a final answer.
+4. `eval.ts` checks whether the model chose the right tool, passed valid arguments, used the observation, and stopped.
+
+Only after that should you add write tools, memory, multiple agents, or frameworks. Anthropic's agent guidance argues for starting with the simplest system that works, making the agent's planning and actions transparent, and carefully designing the interface between the model and tools. LangGraph is useful when you need durable, stateful, long-running orchestration, but a beginner should first understand the loop that LangGraph is helping manage.
+
+<SourceCitation label="Anthropic, Building Effective Agents" href="https://www.anthropic.com/engineering/building-effective-agents" />
+<SourceCitation label="LangGraph overview" href="https://docs.langchain.com/oss/python/langgraph/overview" />
+
+## Section 4: The agent loop
+
+An agent loop is the control flow around the model. The exact implementation varies, but the core shape is stable.
+
+```ts
+for (let step = 0; step < maxSteps; step += 1) {
+  const modelOutput = await callModel({
+    goal,
+    messages,
+    availableTools,
+    state,
+  });
+
+  if (modelOutput.type === "final_answer") {
+    return modelOutput.answer;
+  }
+
+  const toolCall = validateToolCall(modelOutput.toolCall);
+  const result = await executeToolWithPermissions(toolCall, user);
+
+  messages.push({
+    role: "tool",
+    toolName: toolCall.name,
+    content: result,
+  });
+}
+
+throw new Error("Agent stopped because it reached the step limit.");
+```
+
+This loop contains several professional design decisions:
+
+- `maxSteps` prevents infinite loops.
+- `availableTools` limits what the model can request in this run.
+- `validateToolCall` catches malformed or unsafe arguments.
+- `executeToolWithPermissions` enforces user, tenant, and action permissions.
+- The tool result is appended to messages so the model can observe what happened.
+- The loop returns only when the model produces a final answer or the system stops it.
+
+<EquationBlock title="Tool selection" equation={"a_t = argmax_a P(a | g, s_t, T)"}>
+`a_t` is the action selected at step `t`. `argmax_a` means choose the action with the highest score among possible actions. `P(a | g, s_t, T)` is the model's estimated probability of action `a` given the goal `g`, current state `s_t`, and available tools `T`.
+</EquationBlock>
+
+This equation is a simplification. Real models produce tokens, not a neat symbolic action distribution. But it captures the design intuition: the model chooses among possible next actions based on the goal, state, and tools you expose.
+
+## Section 5: ReAct interleaves reasoning and acting
+
+ReAct stands for reasoning and acting. The ReAct paper studied language models that generate reasoning traces and task-specific actions in an interleaved pattern. Instead of only thinking and then answering, the model can reason, act, observe, and update its plan.
+
+A simplified ReAct-style trace looks like this:
+
+```text
+Thought: I need the latest refund policy before deciding.
+Action: search_policy({ "query": "enterprise renewal refund policy" })
+Observation: The policy says enterprise renewals are refundable within 14 days if unused.
+Thought: Now I need the order date and usage status.
+Action: get_order({ "order_id": "8421" })
+Observation: The renewal was 9 days ago and no seats were activated.
+Thought: The order appears eligible, but creating a refund changes state.
+Action: request_human_approval({ "reason": "Refund order 8421 for $4,200" })
+```
+
+The important idea is not that production systems must expose private chain-of-thought text to users. The important idea is that interleaving decision-making with observations helps the system handle tasks where the next step depends on what the previous action revealed.
+
+The ReAct paper reported improvements on question answering and interactive decision-making tasks, and emphasized that actions let models gather information from external environments while reasoning traces help track plans and exceptions.
+
+<SourceCitation label="Yao et al., ReAct: Synergizing Reasoning and Acting in Language Models" href="https://arxiv.org/abs/2210.03629" />
+
+## Section 6: Toolformer showed learned tool use
+
+Toolformer asked a different question: can a language model learn when and how to use external tools from data? The paper introduced a method where a model generated possible API calls, kept calls that improved language modeling loss, and trained on those examples.
+
+The tools in the paper included examples such as a calculator, question-answering system, translation system, search engine, and calendar. The lesson for engineers is not that every production system should reproduce Toolformer's training process. The lesson is that tool use can be treated as part of model behavior: deciding when to call a tool, which arguments to pass, and how to use the returned result are all behaviors that can be trained, prompted, evaluated, and improved.
+
+Toolformer also clarifies why tool use is useful. A language model may be fluent but weak at exact arithmetic, current facts, or private data. A tool can provide the missing capability, while the model provides flexible language understanding and orchestration.
+
+<SourceCitation label="Schick et al., Toolformer: Language Models Can Teach Themselves to Use Tools" href="https://arxiv.org/abs/2302.04761" />
+
+## Section 7: Handoffs, memory, and multi-agent workflows
+
+Some agent systems use multiple specialized agents. A <GlossaryTerm term="handoff">a controlled transfer from one agent or workflow to another.</GlossaryTerm> For example:
+
+- A triage agent decides whether a user needs billing, technical support, or legal review.
+- A retrieval agent gathers sources.
+- A writing agent drafts a response.
+- A compliance agent checks whether the response follows policy.
+
+This can be useful, but more agents do not automatically mean better results. Multi-agent systems add coordination cost. They can duplicate work, disagree, hide responsibility, or make traces harder to inspect.
+
+Memory is another overloaded word. In agent systems, <GlossaryTerm term="memory">state saved for later use.</GlossaryTerm> It can mean chat history, user preferences, retrieved documents, task notes, files, database records, or long-term summaries. Memory should be scoped and permissioned. A customer-support agent should not accidentally retrieve another customer's private history because "memory" was treated as one global bucket.
+
+OpenAI's Agents documentation frames agentic applications around models, tools, instructions, handoffs, guardrails, and tracing. That maps well to the professional mental model: an agent is a controlled software system, not an unconstrained personality.
+
+<SourceCitation label="OpenAI Agents guide" href="https://platform.openai.com/docs/guides/agents" />
+<SourceCitation label="OpenAI Agents SDK documentation" href="https://openai.github.io/openai-agents-js/guides/agents/" />
+
+## Section 8: Guardrails and human review
+
+A <GlossaryTerm term="guardrail">a rule, check, or boundary that prevents or catches unsafe or invalid behavior.</GlossaryTerm> Good guardrails are usually outside the model because they need to be reliable even when the model is confused.
+
+Common guardrails include:
+
+- Tool allowlists for each workflow.
+- Permission checks for every resource.
+- Argument validation before execution.
+- Rate limits and budget limits.
+- Step limits and timeout limits.
+- Read-only mode for exploration.
+- Human approval for high-impact actions.
+- Output validators for citations, formats, or policy requirements.
+- Sandboxes for code execution.
+
+Human review is not a failure of automation. It is a design choice for actions where the cost of a mistaken tool call is high. Examples include sending external emails, issuing refunds, changing production infrastructure, deleting data, approving loans, or making medical or legal claims.
+
+<Quiz
+  question="Where should permission checks happen in an agent system?"
+  options={[
+    "In application code before the tool executes.",
+    "Only in the model's prompt.",
+    "Only after the final answer is shown to the user.",
+  ]}
+  correctIndex={0}
+  explanation="Prompts can guide behavior, but application code must enforce permissions before real tools execute."
+/>
+
+## Section 9: Tracing and observability
+
+Agents can fail in ways that are hard to understand from the final answer alone. A trace records the run.
+
+A useful trace usually includes:
+
+- User goal and normalized task.
+- Model used at each step.
+- Prompt or prompt version.
+- Tools exposed to the model.
+- Tool calls requested by the model.
+- Validated arguments.
+- Tool results or errors.
+- Retries and recovery steps.
+- Final answer.
+- Latency, token usage, tool cost, and total cost.
+- User feedback or evaluation score.
+
+Tracing turns "the agent messed up" into a debuggable question:
+
+- Did the model choose the wrong tool?
+- Did the tool return stale data?
+- Did the schema allow an ambiguous argument?
+- Did a permission check block the correct action?
+- Did the loop stop too early?
+- Did the model ignore the observation?
+- Did the final answer claim more than the tools proved?
+
+Professional teams use traces for debugging, regression testing, incident response, cost control, and audits. Without traces, agent development becomes guesswork.
+
+## Section 10: Evaluation
+
+Agent evaluation needs more than "does the final answer sound good?" You need to test the full workflow.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>What it measures</th>
+        <th>Example failure it catches</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Task success rate</td>
+        <td>Whether the workflow achieved the user goal.</td>
+        <td>The agent answered politely but never completed the requested action.</td>
+      </tr>
+      <tr>
+        <td>Tool-call accuracy</td>
+        <td>Whether the model chose the right tool with valid arguments.</td>
+        <td>The agent searched policies when it needed order data.</td>
+      </tr>
+      <tr>
+        <td>Recovery rate</td>
+        <td>Whether the agent handles tool errors or missing data.</td>
+        <td>The agent gives up after one failed API call instead of retrying or asking for clarification.</td>
+      </tr>
+      <tr>
+        <td>Grounded final answer</td>
+        <td>Whether final claims follow from observations.</td>
+        <td>The agent says a refund was issued when the tool only checked eligibility.</td>
+      </tr>
+      <tr>
+        <td>Safety violation rate</td>
+        <td>Whether the system attempts disallowed actions.</td>
+        <td>The agent tries to access another user's account.</td>
+      </tr>
+      <tr>
+        <td>Cost and latency</td>
+        <td>How expensive and slow the workflow is.</td>
+        <td>The agent loops through unnecessary searches before answering.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+A practical evaluation set should include:
+
+- Easy happy-path tasks.
+- Ambiguous tasks that require clarification.
+- Tool error cases.
+- Permission-denied cases.
+- Cases where no action should be taken.
+- Cases where human approval is required.
+- Regression examples from real failures.
+
+## Section 11: Common production failure modes
+
+Agents fail when the loop, tools, permissions, or observations do not match the real task.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Failure mode</th>
+        <th>What it looks like</th>
+        <th>How engineers reduce it</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Wrong tool choice</td>
+        <td>The model calls a search tool when it needs a database lookup.</td>
+        <td>Improve tool descriptions, reduce overlapping tools, add evals for tool selection.</td>
+      </tr>
+      <tr>
+        <td>Bad arguments</td>
+        <td>The model passes a name where an ID is required.</td>
+        <td>Use strict schemas, validation errors, clarification steps, and examples.</td>
+      </tr>
+      <tr>
+        <td>Looping</td>
+        <td>The agent repeats the same tool call without progress.</td>
+        <td>Add step limits, repeated-action detection, and explicit stop conditions.</td>
+      </tr>
+      <tr>
+        <td>Permission leak</td>
+        <td>The agent requests private data outside the user's scope.</td>
+        <td>Enforce permissions in tool code and filter memory or retrieval by tenant and user.</td>
+      </tr>
+      <tr>
+        <td>Unverified final answer</td>
+        <td>The final response claims an action succeeded when it did not.</td>
+        <td>Require final answers to cite observations and status fields from tool results.</td>
+      </tr>
+      <tr>
+        <td>Tool overuse</td>
+        <td>The agent calls tools when the answer is already known or asks irrelevant queries.</td>
+        <td>Measure cost, add tool-use policies, and tune prompts or models against evals.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 12: A professional design checklist
+
+Before shipping an agent, answer these questions:
+
+- What goal is the agent allowed to pursue?
+- Which tools can it call?
+- Which tools are read-only and which change state?
+- What arguments does each tool accept?
+- How are arguments validated?
+- Who is allowed to call each tool?
+- Which actions require human approval?
+- What state or memory can the agent read?
+- What stop conditions prevent runaway loops?
+- What trace is stored for every run?
+- What evaluation set catches regressions?
+- What should happen when the tool fails?
+- What should happen when the agent is uncertain?
+
+This checklist keeps the agent grounded in engineering reality. The goal is not to make the system look autonomous. The goal is to make useful work happen with clear boundaries, measurable behavior, and recoverable failures.
+
+## Common misconceptions
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Misconception</th>
+        <th>Better understanding</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>"An agent is just a prompt."</td>
+        <td>A prompt may guide behavior, but an agent is a loop with tools, state, observations, stop rules, and execution boundaries.</td>
+      </tr>
+      <tr>
+        <td>"The model executes tools."</td>
+        <td>The model requests tools. Application code validates and executes them.</td>
+      </tr>
+      <tr>
+        <td>"More tools always make the agent better."</td>
+        <td>Too many overlapping tools can confuse selection, increase cost, and expand the risk surface.</td>
+      </tr>
+      <tr>
+        <td>"A successful final answer means the workflow succeeded."</td>
+        <td>The final answer must be checked against trace evidence and tool results.</td>
+      </tr>
+      <tr>
+        <td>"Human review means the agent failed."</td>
+        <td>Human review is appropriate for high-impact, ambiguous, regulated, or irreversible actions.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Practice checks
+
+1. Design a `lookup_invoice` tool. What fields should the schema require? Which permissions should be checked?
+2. A customer asks, "Cancel my subscription and delete all my data." Which parts should be automatic, and which should require confirmation?
+3. An agent calls the same search tool five times with nearly identical queries. What stop rule or trace signal would catch this?
+4. A final answer says "your refund was processed," but the trace only shows an eligibility check. What failed?
+5. Your agent works on easy examples but fails when a tool returns an error. What evaluation cases should you add?
+
+## Primary sources
+
+- Yao et al., ReAct: Synergizing Reasoning and Acting in Language Models. <SourceCitation label="arXiv:2210.03629" href="https://arxiv.org/abs/2210.03629" />
+- Schick et al., Toolformer: Language Models Can Teach Themselves to Use Tools. <SourceCitation label="arXiv:2302.04761" href="https://arxiv.org/abs/2302.04761" />
+- Anthropic, Building Effective Agents. <SourceCitation label="Anthropic engineering" href="https://www.anthropic.com/engineering/building-effective-agents" />
+- OpenAI function calling guide. <SourceCitation label="OpenAI docs" href="https://platform.openai.com/docs/guides/function-calling" />
+- OpenAI Agents guide. <SourceCitation label="OpenAI docs" href="https://platform.openai.com/docs/guides/agents" />
+- OpenAI Agents SDK documentation. <SourceCitation label="Agents SDK docs" href="https://openai.github.io/openai-agents-js/guides/agents/" />
+
+## Additional implementation resources
+
+- OpenAI Agents SDK tools guide. <SourceCitation label="Agents SDK tools guide" href="https://openai.github.io/openai-agents-js/guides/tools/" />
+- OpenAI Cookbook examples. <SourceCitation label="OpenAI Cookbook" href="https://github.com/openai/openai-cookbook" />
+- LangGraph documentation for graph-based agent workflows. <SourceCitation label="LangGraph docs" href="https://docs.langchain.com/oss/python/langgraph/overview" />
+- Model Context Protocol documentation for connecting models to tools and data sources. <SourceCitation label="MCP docs" href="https://modelcontextprotocol.io/docs" />

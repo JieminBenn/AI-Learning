@@ -1,0 +1,780 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson teaches retrieval-augmented generation, usually shortened to RAG. A RAG system gives a language model outside evidence before it answers. The goal is not to memorize one framework or one vector database. The goal is to understand the system shape well enough to design, build, evaluate, and debug one in professional work.
+
+We will move from intuition to implementation:
+
+1. Why language models need retrieval.
+2. What the original RAG paper contributed.
+3. How documents become searchable chunks.
+4. How embeddings and vector search retrieve evidence.
+5. How reranking, metadata, and hybrid search improve retrieval.
+6. How retrieved evidence is placed into the model's prompt.
+7. How engineers evaluate retrieval quality and answer faithfulness.
+8. What breaks in production and how to diagnose it.
+
+## Explain it in 5 minutes
+
+A large language model can generate fluent text from the tokens in its context window, but it does not automatically know your private documentation, the latest product policy, or which page in a manual supports an answer. A <GlossaryTerm term="RAG system">a system that retrieves relevant external information and gives it to a generator before the generator answers.</GlossaryTerm> changes the workflow.
+
+Instead of asking the model:
+
+> "What is our refund policy for enterprise renewals?"
+
+and hoping the answer is inside the model's learned parameters, a RAG system does this:
+
+1. Store company documents in a searchable knowledge base.
+2. Turn the user's question into a search query.
+3. Retrieve the most relevant document chunks.
+4. Put those chunks into the prompt as evidence.
+5. Ask the model to answer using that evidence.
+6. Return citations so a person can inspect the source.
+
+<ConceptDiagram type="rag" />
+
+The original RAG paper by Lewis et al. framed this as combining two kinds of memory. <GlossaryTerm term="Parametric memory">knowledge stored in a model's learned parameters.</GlossaryTerm> is useful, but updating it usually requires training or changing models. <GlossaryTerm term="Non-parametric memory">knowledge stored outside the model, such as a searchable document index.</GlossaryTerm> can be updated by changing the documents or index.
+
+If you only remember one professional lesson, remember this: RAG does not make answers automatically truthful. It creates a pipeline where truth depends on source quality, chunking, retrieval, ranking, prompt construction, generation behavior, and evaluation.
+
+<CheckUnderstanding prompt="What problem does RAG try to solve?">
+RAG helps a model answer with external evidence that may not be stored in the model's parameters or may need to be updated, cited, filtered, or inspected.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define retrieval-augmented generation, retriever, generator, corpus, document, chunk, embedding, vector database, sparse retrieval, dense retrieval, hybrid retrieval, reranker, grounding, citation, recall, precision, mean reciprocal rank, and faithfulness.
+- Trace a question through a complete RAG pipeline.
+- Explain the difference between parametric memory and non-parametric memory.
+- Explain why chunk size and metadata change answer quality.
+- Read the cosine similarity equation and explain every symbol.
+- Compare dense retrieval with keyword retrieval.
+- Explain why top-k retrieval is not the same as answer correctness.
+- Design a small evaluation set for a RAG system.
+- Debug common production failures such as missing evidence, irrelevant evidence, stale indexes, prompt overflow, and unsupported generation.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- A <GlossaryTerm term="large language model">a model trained to predict and generate token sequences.</GlossaryTerm>
+- A <GlossaryTerm term="context window">the maximum amount of text, measured in tokens, the model can use in one request.</GlossaryTerm>
+- A <GlossaryTerm term="hallucination">an answer that sounds plausible but is false, unsupported, or not grounded in the provided evidence.</GlossaryTerm>
+- An <GlossaryTerm term="embedding">a vector representation of text.</GlossaryTerm> Texts with related meaning should have vectors that are close under a chosen similarity measure.
+- A <GlossaryTerm term="corpus">the full collection of documents a retrieval system can search.</GlossaryTerm>
+- A <GlossaryTerm term="query">the user's information need, usually written as a question or search phrase.</GlossaryTerm>
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Retriever</td>
+        <td>The search part of the system.</td>
+        <td>Returns candidate chunks that may contain evidence for the answer.</td>
+      </tr>
+      <tr>
+        <td>Generator</td>
+        <td>The language model that writes the answer.</td>
+        <td>Uses the user question, instructions, and retrieved evidence to produce the final response.</td>
+      </tr>
+      <tr>
+        <td>Chunk</td>
+        <td>A smaller piece of a larger document.</td>
+        <td>The unit that gets embedded, indexed, retrieved, cited, and packed into the prompt.</td>
+      </tr>
+      <tr>
+        <td>Vector search</td>
+        <td>Search over lists of numbers.</td>
+        <td>Finds chunks whose embeddings are close to the query embedding.</td>
+      </tr>
+      <tr>
+        <td>Reranker</td>
+        <td>A second model that sorts retrieved results.</td>
+        <td>Often improves top results by comparing the query and candidate chunks more carefully than the first-stage retriever.</td>
+      </tr>
+      <tr>
+        <td>Grounding</td>
+        <td>Connecting an answer to evidence.</td>
+        <td>A product requirement: generated claims should be supported by retrieved sources.</td>
+      </tr>
+      <tr>
+        <td>Faithfulness</td>
+        <td>Whether the answer follows the evidence.</td>
+        <td>A key evaluation dimension separate from style, helpfulness, or general correctness.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: Why not just ask the model?
+
+LLMs are powerful, but they have three practical limits that RAG is designed to address.
+
+First, model knowledge can be stale. A model may not know a policy updated yesterday. Retrieval lets the application search the current source of truth at request time.
+
+Second, model knowledge can be private. A public model was not trained on your internal handbook, support tickets, customer contracts, or engineering runbooks. Retrieval lets the application use authorized private data without training a new model for every update.
+
+Third, model knowledge is hard to inspect. If a model says "the warranty lasts two years," a user needs to know which document says that. Retrieval can attach citations and source snippets.
+
+The RAG paper describes this as combining a pretrained model with explicit non-parametric memory. In the paper, the non-parametric memory is a dense vector index over Wikipedia. In a business application, it might be a product documentation site, a contract database, a codebase, a help center, or a collection of research papers.
+
+<CheckUnderstanding prompt="Why is RAG useful even when the model is very strong?">
+Because strength at language generation does not guarantee access to current, private, source-specific, or auditable knowledge. RAG gives the model external evidence at answer time.
+</CheckUnderstanding>
+
+## Section 2: The original RAG idea
+
+Lewis et al. introduced RAG as a recipe for knowledge-intensive natural language processing tasks. A <GlossaryTerm term="knowledge-intensive task">a task where success depends on specific factual information.</GlossaryTerm> Open-domain question answering is the easiest example: the user asks a question, and the system must find information somewhere in a large collection.
+
+The paper combined:
+
+- A retriever that searches a dense vector index.
+- A generator based on a pretrained sequence-to-sequence model.
+- Retrieved passages from Wikipedia as external memory.
+
+The authors compared two RAG variants.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Variant</th>
+        <th>Plain-language idea</th>
+        <th>Why it matters</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>RAG-Sequence</td>
+        <td>Use the same retrieved passages for the whole generated answer.</td>
+        <td>Simple and close to how many production RAG applications work.</td>
+      </tr>
+      <tr>
+        <td>RAG-Token</td>
+        <td>Allow different retrieved passages to influence different output tokens.</td>
+        <td>More flexible, but harder to explain and implement as a simple application pipeline.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+The paper reported that RAG improved several open-domain question answering tasks and generated more specific, diverse, and factual language than a parametric-only baseline. The professional takeaway is broader than the exact architecture: separating knowledge storage from generation gives engineers a new control surface. You can update documents, inspect retrieved evidence, change retrieval models, add filters, and evaluate the search stage separately from the generator.
+
+<SourceCitation label="Lewis et al., Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks" href="https://arxiv.org/abs/2005.11401" />
+
+## Section 3: The system pipeline
+
+A production RAG system usually has two flows: an indexing flow and an answering flow.
+
+The indexing flow prepares knowledge before the user asks:
+
+1. Collect source documents.
+2. Clean the text.
+3. Split documents into chunks.
+4. Attach metadata such as title, URL, owner, date, permissions, and section heading.
+5. Embed each chunk.
+6. Store embeddings, text, and metadata in an index.
+
+The answering flow runs when the user asks:
+
+1. Receive the question.
+2. Rewrite or classify the query if needed.
+3. Embed the query or run keyword search.
+4. Retrieve candidate chunks.
+5. Filter by permissions, date, product, or tenant.
+6. Rerank candidates.
+7. Pack the best evidence into the prompt.
+8. Generate an answer with citations.
+9. Evaluate, log, and monitor the result.
+
+<EquationBlock title="RAG in one line" equation={"answer = generator(question, retrieve(question, corpus))"}>
+The retriever searches the corpus for evidence related to the question. The generator receives both the question and the retrieved evidence.
+</EquationBlock>
+
+This equation hides many engineering details, but it gives the correct mental model: RAG is not one model call. It is a system that connects data preparation, search, prompt construction, model generation, and evaluation.
+
+## Section 4: Documents become chunks
+
+A language model cannot usually read an entire company knowledge base in one prompt. A retriever also needs smaller units to rank. That is why documents are split into chunks.
+
+A <GlossaryTerm term="chunk">a piece of text chosen as the searchable unit.</GlossaryTerm> A chunk might be a paragraph, a section, a page, a support article, a code function, or a sliding window of tokens.
+
+Chunking sounds boring until it breaks the system.
+
+Suppose a refund policy says:
+
+> Enterprise renewals are refundable for 14 days after invoice date if the customer has not activated new seats.
+
+Bad chunking might split this into:
+
+- Chunk A: "Enterprise renewals are refundable for 14 days after invoice date..."
+- Chunk B: "...if the customer has not activated new seats."
+
+If the retriever returns only Chunk A, the model may answer with an incomplete policy. If it returns only Chunk B, the model may not know what the condition applies to.
+
+Good chunking tries to preserve meaning. Common strategies include:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Strategy</th>
+        <th>Best for</th>
+        <th>Risk</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Fixed-size chunks</td>
+        <td>Fast first version, consistent token budgets.</td>
+        <td>Can split important ideas across boundaries.</td>
+      </tr>
+      <tr>
+        <td>Paragraph or section chunks</td>
+        <td>Documentation, policies, papers, manuals.</td>
+        <td>Chunk sizes can vary a lot.</td>
+      </tr>
+      <tr>
+        <td>Overlapping chunks</td>
+        <td>Cases where context near boundaries matters.</td>
+        <td>More storage, duplicate retrieval, citation clutter.</td>
+      </tr>
+      <tr>
+        <td>Hierarchical chunks</td>
+        <td>Long documents with headings and nested sections.</td>
+        <td>More complex indexing and prompt assembly.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Professional heuristic: start with semantic chunks based on document structure, add modest overlap, store section metadata, then evaluate. Do not tune chunk size by vibes. Create questions whose answers are known, inspect which chunks are retrieved, and measure whether answer evidence appears in the top results.
+
+<Quiz
+  question="Why can chunking change answer quality?"
+  options={[
+    "Because chunking controls what evidence the retriever can return and what context the model sees.",
+    "Because chunking changes the model's learned parameters.",
+    "Because smaller chunks always produce better citations.",
+    "Because chunking removes the need for evaluation.",
+  ]}
+  correctIndex={0}
+  explanation="The retriever searches chunks, not the original document in a human sense. If chunks split evidence badly or hide necessary context, the generator may receive incomplete or misleading material."
+/>
+
+## Section 5: Embeddings and vector search
+
+An embedding model turns text into a vector. A <GlossaryTerm term="vector">a list of numbers.</GlossaryTerm> Similar texts should land near each other in the vector space. OpenAI's embeddings guide describes embeddings as useful for search, clustering, recommendations, anomaly detection, diversity measurement, and classification.
+
+In RAG, we usually embed:
+
+- Each document chunk during indexing.
+- The user query during answering.
+
+Then we compare the query vector to chunk vectors.
+
+<EquationBlock title="Cosine similarity" equation={"cosine(q, d) = (q . d) / (||q|| ||d||)"}>
+`q` is the query embedding vector. `d` is a document chunk embedding vector. `q . d` is the dot product: multiply matching dimensions and add the results. `||q||` and `||d||` are vector lengths. Cosine similarity is high when the vectors point in a similar direction.
+</EquationBlock>
+
+If the user asks:
+
+> "How long do enterprise customers have to request a refund after renewal?"
+
+a dense retriever can match a chunk containing:
+
+> "Enterprise renewals are refundable for 14 days after invoice date..."
+
+even if the words "how long" and "request" do not appear in the chunk. That is the promise of semantic retrieval.
+
+<SourceCitation label="OpenAI embeddings guide" href="https://platform.openai.com/docs/guides/embeddings" />
+
+## Section 6: Sparse, dense, and hybrid retrieval
+
+There are two major retrieval families beginners should know.
+
+<GlossaryTerm term="Sparse retrieval">keyword-style retrieval where text is represented mostly by which terms appear.</GlossaryTerm> Classic systems such as BM25 reward documents that contain important query terms. Sparse retrieval is often strong for exact names, product codes, error strings, legal terms, and rare words.
+
+<GlossaryTerm term="Dense retrieval">embedding-based retrieval where text is represented by dense vectors.</GlossaryTerm> Dense retrieval can match meaning across different wording. Dense Passage Retrieval, or DPR, showed that a dual-encoder dense retriever could outperform a strong BM25 baseline on several open-domain question answering datasets.
+
+<SourceCitation label="Karpukhin et al., Dense Passage Retrieval for Open-Domain Question Answering" href="https://arxiv.org/abs/2004.04906" />
+
+The tradeoff is important:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Retrieval type</th>
+        <th>Strength</th>
+        <th>Failure mode</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Sparse retrieval</td>
+        <td>Excellent for exact terms, IDs, names, and rare words.</td>
+        <td>Can miss paraphrases or conceptually related passages.</td>
+      </tr>
+      <tr>
+        <td>Dense retrieval</td>
+        <td>Good for semantic similarity and natural-language questions.</td>
+        <td>Can retrieve plausible but wrong passages if the embedding space confuses concepts.</td>
+      </tr>
+      <tr>
+        <td>Hybrid retrieval</td>
+        <td>Combines exact matching and semantic matching.</td>
+        <td>Requires score merging, tuning, and more evaluation.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Professional heuristic: use hybrid retrieval when the corpus contains IDs, product names, code symbols, legal terms, or support errors. Dense-only retrieval can be lovely for prose questions, then oddly bad when the user asks about `ERR_BILLING_042`.
+
+## Section 7: Top-k retrieval and reranking
+
+<GlossaryTerm term="Top-k retrieval">returning the k highest-scoring search results.</GlossaryTerm> If `k = 5`, the system returns five chunks. Bigger `k` gives the generator more chances to see the right evidence, but it also consumes context window space and may introduce distracting evidence.
+
+Retrieval is often two-stage:
+
+1. A fast first-stage retriever returns many candidates, such as 20 or 100 chunks.
+2. A slower reranker scores those candidates more carefully and keeps the best few.
+
+A <GlossaryTerm term="reranker">a model or scoring method that reorders candidate results after initial retrieval.</GlossaryTerm> Unlike a simple embedding comparison, a reranker can look at the query and candidate text together. That is often more accurate but more expensive.
+
+Here is the core reason reranking helps:
+
+- The first-stage retriever must search a large corpus quickly.
+- The reranker only examines a small candidate set.
+- Because the candidate set is smaller, the reranker can use a more expensive relevance judgment.
+
+<CheckUnderstanding prompt="Why not always retrieve 50 chunks and give them all to the model?">
+Because context windows are finite. Too many chunks increase cost, latency, and distraction. The model may use irrelevant evidence or miss the important passage among clutter.
+</CheckUnderstanding>
+
+## Section 8: Prompt assembly and grounded generation
+
+After retrieval, the application builds the prompt. This is where many RAG systems quietly fail.
+
+A basic RAG prompt has four parts:
+
+1. The system instruction.
+2. The user's question.
+3. Retrieved evidence, usually with source IDs.
+4. Output instructions, such as "cite sources" or "say when the sources do not answer."
+
+Example:
+
+```text
+You are a support assistant. Answer only from the provided sources.
+If the sources do not contain the answer, say that the documents do not say.
+
+Question:
+How long is the enterprise renewal refund window?
+
+Sources:
+[S1] Enterprise renewals are refundable for 14 days after invoice date if the customer has not activated new seats.
+[S2] Standard monthly subscriptions may be cancelled at any time, but prior invoices are not refunded.
+
+Answer with citations.
+```
+
+A good answer would be:
+
+```text
+Enterprise renewals are refundable for 14 days after the invoice date, as long as the customer has not activated new seats. [S1]
+```
+
+An unsupported answer would be:
+
+```text
+Enterprise customers always have 30 days to request a refund. [S1]
+```
+
+The citation does not rescue the answer. A citation is only useful if the cited source actually supports the claim.
+
+Professional prompt rules:
+
+- Keep source IDs stable and visible.
+- Separate source text from instructions.
+- Tell the model what to do when evidence is missing.
+- Avoid mixing retrieved evidence with untrusted user text without boundaries.
+- Ask for concise answers when long answers would dilute citations.
+- Log which chunks were used so failures can be inspected later.
+
+## Builder lab: Make a first RAG project in VS Code
+
+Use this lab after you understand the pipeline. The goal is not to build the fanciest chatbot. The goal is to create a small system whose data flow you can inspect.
+
+Recommended beginner toolchain:
+
+- VS Code as the editor.
+- Node.js with TypeScript, or Python if you are more comfortable there.
+- A tiny `docs/` folder with 5 to 10 Markdown files.
+- A local JSON file for your first chunk store.
+- One embedding provider or local embedding model.
+- A test file with questions and expected source IDs.
+
+Start with these files:
+
+```text
+rag-demo/
+  docs/
+    refunds.md
+    billing-errors.md
+  src/
+    ingest.ts
+    retrieve.ts
+    answer.ts
+    eval.ts
+  package.json
+```
+
+Build it in this order:
+
+1. `ingest.ts` reads files from `docs/`, splits by headings, and records `id`, `title`, `sourcePath`, `text`, and `updatedAt`.
+2. `retrieve.ts` embeds the user question, scores chunks, and prints the top results before any model writes an answer.
+3. `answer.ts` builds a prompt with source IDs and tells the model to answer only from those sources.
+4. `eval.ts` runs fixed questions and checks whether the expected source ID appears in the retrieved top `k` results.
+
+Do not add a vector database first. A vector database is useful when the corpus grows, but a local JSON store makes the core idea visible. Once you can explain why each chunk was retrieved, replace the local store with Elasticsearch, Postgres with pgvector, Chroma, Pinecone, Weaviate, Qdrant, or another index.
+
+LlamaIndex describes RAG as loading, indexing, storing, querying, and evaluation. That is a helpful checklist for your first project: do not stop after the query works. Add evaluation before tuning chunk sizes or prompts.
+
+<SourceCitation label="LlamaIndex introduction to RAG" href="https://developers.llamaindex.ai/python/framework/understanding/rag/" />
+
+## Section 9: A small implementation sketch
+
+This code is intentionally small. It shows the shape of RAG without hiding the concept inside a framework.
+
+```ts
+type Chunk = {
+  id: string;
+  text: string;
+  sourceUrl: string;
+  embedding: number[];
+};
+
+function cosineSimilarity(a: number[], b: number[]) {
+  let dot = 0;
+  let aLength = 0;
+  let bLength = 0;
+
+  for (let i = 0; i < a.length; i += 1) {
+    dot += a[i] * b[i];
+    aLength += a[i] * a[i];
+    bLength += b[i] * b[i];
+  }
+
+  return dot / (Math.sqrt(aLength) * Math.sqrt(bLength));
+}
+
+function retrieve(queryEmbedding: number[], chunks: Chunk[], k = 4) {
+  return chunks
+    .map((chunk) => ({
+      chunk,
+      score: cosineSimilarity(queryEmbedding, chunk.embedding),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
+}
+```
+
+In a real system, you would not scan every chunk in application memory after the corpus grows. You would use a search engine, vector database, or similarity-search library. The code is useful because it makes the hidden operation visible: compare the query vector to chunk vectors, sort by score, and keep the top results.
+
+The OpenAI Cookbook has runnable examples that combine embeddings, vector databases, and generation. LangChain and LlamaIndex provide higher-level building blocks for document loading, splitting, indexing, retrieval, and RAG application patterns.
+
+<SourceCitation label="OpenAI Cookbook RAG with Elasticsearch" href="https://cookbook.openai.com/examples/vector_databases/elasticsearch/elasticsearch-retrieval-augmented-generation" />
+<SourceCitation label="LangChain retrieval documentation" href="https://docs.langchain.com/oss/python/langchain/retrieval" />
+<SourceCitation label="LlamaIndex introduction to RAG" href="https://developers.llamaindex.ai/python/framework/understanding/rag/" />
+
+## Section 10: Evaluation starts with retrieval
+
+RAG evaluation has at least two layers:
+
+1. Did retrieval find the right evidence?
+2. Did generation use the evidence faithfully?
+
+Beginners often start by grading only final answers. That hides the real failure. If the right chunk was never retrieved, the generator may have had no chance. If the right chunk was retrieved but ignored, the generation prompt or model behavior may be the problem.
+
+Important retrieval metrics:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Question it answers</th>
+        <th>Beginner example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Recall at k</td>
+        <td>Was a relevant chunk anywhere in the top k?</td>
+        <td>If the answer chunk appears in the top 5 for 80 of 100 questions, recall at 5 is 80%.</td>
+      </tr>
+      <tr>
+        <td>Precision at k</td>
+        <td>How many returned chunks were relevant?</td>
+        <td>If 3 of the top 5 chunks are relevant, precision at 5 is 60% for that query.</td>
+      </tr>
+      <tr>
+        <td>Mean reciprocal rank</td>
+        <td>How high does the first relevant result appear?</td>
+        <td>If the first relevant chunk is ranked 1, the reciprocal rank is 1. If it is ranked 4, the reciprocal rank is 1/4.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<EquationBlock title="Recall at k" equation={"recall@k = questions with a relevant result in top k / total questions"}>
+The numerator counts questions where the retriever surfaced at least one relevant result in the top `k`. The denominator is the total number of evaluated questions.
+</EquationBlock>
+
+<EquationBlock title="Mean reciprocal rank" equation={"MRR = average(1 / rank_of_first_relevant_result)"}>
+For each question, find the rank of the first relevant result. Rank 1 contributes `1`. Rank 2 contributes `1/2`. Rank 10 contributes `1/10`. Then average across questions.
+</EquationBlock>
+
+The BEIR benchmark was created to evaluate information retrieval models across diverse tasks and datasets, especially zero-shot retrieval where the model is tested outside the exact data it was trained on. For a production RAG system, the same spirit matters: evaluate on realistic questions from your own users, not only on examples that make the demo look good.
+
+<SourceCitation label="Thakur et al., BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of Information Retrieval Models" href="https://arxiv.org/abs/2104.08663" />
+
+## Section 11: Evaluate the answer, not just the search
+
+After retrieval metrics, evaluate generated answers.
+
+Useful answer dimensions:
+
+- <GlossaryTerm term="Faithfulness">whether the answer is supported by the retrieved sources.</GlossaryTerm>
+- <GlossaryTerm term="Answer relevance">whether the answer addresses the user's question.</GlossaryTerm>
+- <GlossaryTerm term="Citation accuracy">whether cited sources actually support the claims they are attached to.</GlossaryTerm>
+- <GlossaryTerm term="Completeness">whether the answer includes the necessary conditions, exceptions, and caveats.</GlossaryTerm>
+- <GlossaryTerm term="Refusal quality">whether the system says it does not know when sources are insufficient.</GlossaryTerm>
+
+A minimal evaluation set should include:
+
+1. Straightforward questions with one clear source.
+2. Questions requiring two sources.
+3. Questions where the corpus does not contain the answer.
+4. Questions with tempting but outdated documents.
+5. Questions with exact terms such as product IDs or error codes.
+6. Ambiguous questions that need clarification.
+7. Permission-sensitive questions where some documents must not be retrieved.
+
+<CheckUnderstanding prompt="Why include questions where the corpus does not contain the answer?">
+Because a production RAG system must know when not to answer. If every evaluation question has an answer, you will not test unsupported-answer behavior.
+</CheckUnderstanding>
+
+## Section 12: Common misconceptions
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Misconception</th>
+        <th>Correction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>RAG eliminates hallucinations.</td>
+        <td>RAG can reduce unsupported answers, but only if retrieval, prompting, and evaluation are strong.</td>
+      </tr>
+      <tr>
+        <td>Vector search is always better than keyword search.</td>
+        <td>Dense retrieval and sparse retrieval solve different matching problems. Many production systems use both.</td>
+      </tr>
+      <tr>
+        <td>If the source is in the database, the model can answer from it.</td>
+        <td>The source must be chunked, indexed, retrieved, selected, and placed into the prompt.</td>
+      </tr>
+      <tr>
+        <td>More retrieved chunks always improve quality.</td>
+        <td>More chunks can add noise, cost, latency, and prompt overflow.</td>
+      </tr>
+      <tr>
+        <td>Citations prove correctness.</td>
+        <td>Citations prove only that the system attached a source. The claim still has to be supported by that source.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 13: Production failure modes
+
+When a RAG answer is bad, ask where the failure entered the pipeline.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Symptom</th>
+        <th>Likely cause</th>
+        <th>Debug move</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>The answer is fluent but unsupported.</td>
+        <td>The generator ignored evidence or filled gaps from parametric memory.</td>
+        <td>Inspect retrieved chunks, tighten prompt rules, add abstention tests, and grade faithfulness.</td>
+      </tr>
+      <tr>
+        <td>The right document exists but is not retrieved.</td>
+        <td>Chunking, embeddings, metadata filters, or query wording failed.</td>
+        <td>Run retrieval-only evals and inspect top 20 candidates before generation.</td>
+      </tr>
+      <tr>
+        <td>The system cites old policy.</td>
+        <td>Stale index or missing freshness metadata.</td>
+        <td>Add updated_at metadata, reindex checks, and recency-aware ranking.</td>
+      </tr>
+      <tr>
+        <td>Answers leak information across users.</td>
+        <td>Authorization filtering is missing or applied after retrieval incorrectly.</td>
+        <td>Enforce tenant and permission filters before evidence reaches the model.</td>
+      </tr>
+      <tr>
+        <td>The model gives vague summaries.</td>
+        <td>Chunks are too broad, prompt asks for generic synthesis, or question is underspecified.</td>
+        <td>Use more specific chunks, require cited claims, and ask clarifying questions when needed.</td>
+      </tr>
+      <tr>
+        <td>Latency is too high.</td>
+        <td>Too many retrieval calls, slow reranking, large prompts, or expensive generation.</td>
+        <td>Cache stable embeddings, tune top-k, batch operations, and measure each stage separately.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Professional systems log enough detail to replay a failure: user question, query rewrite, filters, retrieved chunk IDs, scores, reranked order, prompt token count, model name, answer, citations, latency, and evaluation labels. Without traces, RAG debugging becomes guessing in a nice jacket.
+
+## Section 14: When RAG is not the right tool
+
+RAG is powerful, but it is not the answer to every AI problem.
+
+Use RAG when:
+
+- The answer should come from a changing or inspectable knowledge base.
+- Users need citations.
+- Knowledge is too large or too private to place in every prompt.
+- The task is mostly question answering, summarization, or synthesis over documents.
+- You can evaluate source relevance and answer faithfulness.
+
+Consider another approach when:
+
+- The task needs a stable behavior pattern rather than external facts. Fine-tuning may be better.
+- The source of truth is structured data. A database query or tool call may be better than semantic chunk retrieval.
+- The answer requires live actions. An agent or workflow with tool calls may be needed.
+- The corpus is tiny enough to fit cleanly in the prompt. Long-context prompting may be simpler.
+- The content is low quality, contradictory, or not trusted. Retrieval cannot fix bad sources by itself.
+
+The professional question is not "Should we use RAG?" The better question is "What is the source of truth, and what mechanism gives the model the right evidence at the right time with measurable reliability?"
+
+## Section 15: Capstone design
+
+Design a cited technical-support assistant over a product documentation library.
+
+Minimum requirements:
+
+- Ingest product docs with title, URL, product area, version, and updated date.
+- Split pages by section headings with small overlap.
+- Store chunk text, metadata, and embeddings.
+- Retrieve with hybrid search: keyword plus vector search.
+- Rerank the top candidates.
+- Generate concise answers with source citations.
+- Refuse when sources do not answer the question.
+- Evaluate with at least 50 realistic questions.
+
+Starter evaluation table:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Question type</th>
+        <th>Example</th>
+        <th>What to measure</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Single-source factual</td>
+        <td>What is the refund window for enterprise renewals?</td>
+        <td>Recall at 5, citation accuracy, faithfulness.</td>
+      </tr>
+      <tr>
+        <td>Multi-source synthesis</td>
+        <td>Can a customer downgrade and keep audit logs?</td>
+        <td>Completeness and correct use of multiple citations.</td>
+      </tr>
+      <tr>
+        <td>No-answer</td>
+        <td>Does the product support a feature not mentioned in docs?</td>
+        <td>Whether the system refuses instead of inventing.</td>
+      </tr>
+      <tr>
+        <td>Exact identifier</td>
+        <td>How do I fix ERR_BILLING_042?</td>
+        <td>Hybrid retrieval quality and exact-term handling.</td>
+      </tr>
+      <tr>
+        <td>Freshness</td>
+        <td>What is the current seat activation rule?</td>
+        <td>Whether the newest valid policy wins.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Practice checks
+
+1. Explain RAG to a non-technical teammate without using the word "embedding."
+2. Draw the indexing flow and answering flow separately.
+3. Given a bad answer, list three ways to tell whether retrieval or generation caused it.
+4. Create five evaluation questions where the answer should be "the documents do not say."
+5. Pick a document page and propose a chunking strategy. What metadata would you store?
+
+<Quiz
+  question="A RAG system retrieves the correct source in the top 5 results, but the final answer invents a policy exception not in that source. Which stage most likely failed?"
+  options={[
+    "Generation or prompt-grounding failed, because the right evidence was available but the answer did not stay faithful to it.",
+    "Indexing failed, because the document was not stored at all.",
+    "Recall at 5 failed, because the right source was absent from the top 5.",
+    "The vector database failed, because citations always guarantee correctness.",
+  ]}
+  correctIndex={0}
+  explanation="If the correct evidence was retrieved but the answer added unsupported claims, retrieval may have worked. The next suspects are prompt assembly, generation instructions, model behavior, and faithfulness evaluation."
+/>
+
+## Primary sources and implementation resources
+
+<div className="source-list">
+  <SourceCitation label="Lewis et al., Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks" href="https://arxiv.org/abs/2005.11401" />
+  <SourceCitation label="Karpukhin et al., Dense Passage Retrieval for Open-Domain Question Answering" href="https://arxiv.org/abs/2004.04906" />
+  <SourceCitation label="Thakur et al., BEIR benchmark" href="https://arxiv.org/abs/2104.08663" />
+  <SourceCitation label="OpenAI embeddings guide" href="https://platform.openai.com/docs/guides/embeddings" />
+  <SourceCitation label="OpenAI Cookbook RAG with Elasticsearch" href="https://cookbook.openai.com/examples/vector_databases/elasticsearch/elasticsearch-retrieval-augmented-generation" />
+  <SourceCitation label="LlamaIndex introduction to RAG" href="https://developers.llamaindex.ai/python/framework/understanding/rag/" />
+  <SourceCitation label="LangChain retrieval documentation" href="https://docs.langchain.com/oss/python/langchain/retrieval" />
+</div>

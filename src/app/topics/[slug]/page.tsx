@@ -78,6 +78,26 @@ export default async function TopicPage({ params }: TopicPageProps) {
         </article>
       </section>
 
+      <section className="section">
+        <div className="section__header">
+          <span className="eyebrow">Builder path</span>
+          <h2>How to turn this topic into a working project.</h2>
+          <p>
+            Use this as the bridge from reading to implementation. The goal is to
+            build a small, inspectable version before adding frameworks or production
+            complexity.
+          </p>
+        </div>
+        <ol className="check-list">
+          {topic.buildPath.map((step) => (
+            <li key={step}>
+              <CheckCircle2 aria-hidden="true" size={17} />
+              {step}
+            </li>
+          ))}
+        </ol>
+      </section>
+
       <section className="section source-band">
         <div>
           <span className="eyebrow">Primary sources</span>

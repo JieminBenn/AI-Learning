@@ -535,6 +535,45 @@ Trace the generation:
 8. The model predicts the next token conditioned on the prompt plus "A".
 9. The loop continues until the model emits a stop signal or reaches a token limit.
 
+## Builder lab: Make a first LLM evaluation project in VS Code
+
+Use this lab after you understand prompting, decoding, and evaluation. The goal is not to train a model. The goal is to learn how professionals compare model behavior instead of judging one impressive answer by eye.
+
+Recommended beginner toolchain:
+
+- VS Code as the editor.
+- Node.js with TypeScript, or Python if you prefer Python.
+- One model provider SDK.
+- A small `evals.json` file with 10 to 20 examples.
+- A script that runs the same examples against different prompts or decoding settings.
+
+Start with these files:
+
+```text
+llm-eval-demo/
+  evals/
+    classification.json
+    summarization.json
+  src/
+    callModel.ts
+    runEval.ts
+    score.ts
+  package.json
+```
+
+Build it in this order:
+
+1. `callModel.ts` sends one prompt to one model and records model name, input text, output text, temperature, latency, and token counts if the provider returns them.
+2. `runEval.ts` loops over examples and saves every output. Do not overwrite old runs; comparison is the point.
+3. `score.ts` checks simple things first: valid JSON, expected label, answer length, refusal behavior, or whether required facts are preserved.
+4. Change one variable at a time: prompt wording, examples, model, temperature, or max output tokens.
+
+Anthropic's prompt engineering docs recommend defining success criteria and empirical tests before trying to improve prompts. That is the habit this lab builds: write down what "good" means, run examples, inspect failures, then change the system.
+
+<SourceCitation label="Anthropic prompt engineering overview" href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview" />
+<SourceCitation label="Anthropic evaluation tool documentation" href="https://platform.claude.com/docs/en/test-and-evaluate/eval-tool" />
+<SourceCitation label="Hugging Face text generation documentation" href="https://huggingface.co/docs/transformers/main_classes/text_generation" />
+
 ## Implementation sketch: decoding settings in code
 
 This simplified code shows the job of a decoder: turn raw logits into a probability distribution, optionally sharpen or flatten it with temperature, then choose a token. Real systems call a model to get logits; this example starts from fake logits so you can see the decoding step alone.
@@ -649,7 +688,13 @@ You are ready to continue when you can:
 
 <SourceCitation label="OpenAI prompt engineering guide" href="https://developers.openai.com/api/docs/guides/prompt-engineering" />
 
+<SourceCitation label="Anthropic prompt engineering overview" href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview" />
+
+<SourceCitation label="Anthropic evaluation tool documentation" href="https://platform.claude.com/docs/en/test-and-evaluate/eval-tool" />
+
 <SourceCitation label="OpenAI tiktoken repository" href="https://github.com/openai/tiktoken" />
+
+<SourceCitation label="Hugging Face text generation documentation" href="https://huggingface.co/docs/transformers/main_classes/text_generation" />
 
 <SourceCitation label="Hugging Face Transformers generation strategies" href="https://huggingface.co/docs/transformers/v4.44.1/generation_strategies" />
 

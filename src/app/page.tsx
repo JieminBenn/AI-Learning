@@ -39,13 +39,18 @@ const roadmapDestinations: Record<string, { href: string; label: string }[]> = {
     { href: "/lessons/llm-foundations", label: "Open LLM Foundations lesson" },
     { href: "/models", label: "Explore model families" },
   ],
-  "RAG Systems": [{ href: "/topics/rag", label: "Open RAG topic" }],
-  "Agents and Tool Use": [
-    { href: "/topics/agents", label: "Open Agents topic" },
-    { href: "/topics/skills", label: "Open Skills topic" },
+  "RAG Systems": [
+    { href: "/lessons/rag-systems", label: "Open RAG Systems lesson" },
+    { href: "/topics/rag", label: "Open RAG build path" },
   ],
-  "Fine-Tuning": [{ href: "/topics/fine-tuning", label: "Open Fine-Tuning topic" }],
-  "AI Systems": [{ href: "/topics/ai-infra", label: "Open AI Infrastructure topic" }],
+  "Agents and Tool Use": [
+    { href: "/lessons/agents-and-tool-use", label: "Open Agents lesson" },
+    { href: "/topics/agents", label: "Open Agents build path" },
+    { href: "/topics/skills", label: "Open Tool Skills build path" },
+  ],
+  "Data Pipelines": [{ href: "/lessons/data-pipelines", label: "Open Data Pipelines lesson" }],
+  "Fine-Tuning": [{ href: "/topics/fine-tuning", label: "Open Fine-Tuning build path" }],
+  "AI Systems": [{ href: "/topics/ai-infra", label: "Open AI Infrastructure build path" }],
 };
 
 function getModuleId(title: string) {

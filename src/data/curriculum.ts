@@ -19,6 +19,7 @@ export type Topic = {
   summary: string;
   professionalOutcome: string;
   essentials: string[];
+  buildPath: string[];
   capstone: string;
   sources: {
     label: string;
@@ -123,12 +124,188 @@ export const llmFoundationsLesson: LessonMeta = {
       href: "https://developers.openai.com/api/docs/guides/prompt-engineering",
     },
     {
+      label: "Anthropic prompt engineering overview",
+      href: "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview",
+    },
+    {
+      label: "Hugging Face text generation documentation",
+      href: "https://huggingface.co/docs/transformers/main_classes/text_generation",
+    },
+    {
       label: "OpenAI Cookbook examples repository",
       href: "https://github.com/openai/openai-cookbook",
     },
     {
       label: "Hugging Face Transformers repository",
       href: "https://github.com/huggingface/transformers",
+    },
+  ],
+};
+
+export const ragSystemsLesson: LessonMeta = {
+  slug: "rag-systems",
+  title: "RAG Systems",
+  level: "Builder",
+  prerequisites: [
+    "Complete LLM Foundations first, or know what tokens, context windows, embeddings, and hallucinations mean",
+    "No search-engine background required",
+    "Comfort with simple vectors and percentages helps, but every metric is explained",
+  ],
+  tags: ["RAG", "Retrieval", "Embeddings", "Evaluation", "Systems"],
+  objectives: [
+    "Define retrieval-augmented generation, parametric memory, non-parametric memory, embeddings, vector search, chunking, top-k retrieval, reranking, grounding, citations, recall, precision, mean reciprocal rank, and faithfulness from first principles.",
+    "Trace a user question through ingestion, chunking, embedding, indexing, retrieval, reranking, prompt assembly, generation, citation, and evaluation.",
+    "Explain the core retrieval score equation and what cosine similarity measures.",
+    "Compare sparse retrieval, dense retrieval, hybrid retrieval, reranking, and long-context prompting at a practical level.",
+    "Diagnose production failure modes such as missing chunks, stale indexes, retrieval mismatch, source confusion, prompt overflow, unsupported answers, and evaluation blind spots.",
+  ],
+  outcomes: [
+    "You can design a RAG pipeline for a real document collection without treating vector search as magic.",
+    "You can choose chunking, metadata, retrieval, reranking, prompting, and evaluation strategies based on tradeoffs.",
+    "You can debug whether a bad answer came from retrieval, generation, source quality, prompt construction, or evaluation design.",
+  ],
+  sources: [
+    {
+      label: "Lewis et al., Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      href: "https://arxiv.org/abs/2005.11401",
+    },
+    {
+      label: "Karpukhin et al., Dense Passage Retrieval for Open-Domain Question Answering",
+      href: "https://arxiv.org/abs/2004.04906",
+    },
+    {
+      label: "Thakur et al., BEIR benchmark",
+      href: "https://arxiv.org/abs/2104.08663",
+    },
+    {
+      label: "OpenAI embeddings guide",
+      href: "https://platform.openai.com/docs/guides/embeddings",
+    },
+    {
+      label: "OpenAI Cookbook RAG with Elasticsearch",
+      href: "https://cookbook.openai.com/examples/vector_databases/elasticsearch/elasticsearch-retrieval-augmented-generation",
+    },
+    {
+      label: "LlamaIndex introduction to RAG",
+      href: "https://developers.llamaindex.ai/python/framework/understanding/rag/",
+    },
+    {
+      label: "LangChain retrieval documentation",
+      href: "https://docs.langchain.com/oss/python/langchain/retrieval",
+    },
+  ],
+};
+
+export const agentsAndToolUseLesson: LessonMeta = {
+  slug: "agents-and-tool-use",
+  title: "Agents and Tool Use",
+  level: "Builder",
+  prerequisites: [
+    "Complete LLM Foundations and RAG Systems first, or know what prompts, context windows, tool results, and hallucinations mean",
+    "No software automation background required",
+    "Comfort with JSON objects helps, but schemas and arguments are explained from first principles",
+  ],
+  tags: ["Agents", "Tool Use", "Function Calling", "Automation", "Evaluation"],
+  objectives: [
+    "Define agent, tool, function calling, tool schema, argument validation, observation, state, plan, action, stop condition, handoff, memory, guardrail, trace, and human-in-the-loop review from first principles.",
+    "Trace a user goal through an agent loop that observes state, chooses actions, validates tool calls, executes tools, records results, and stops safely.",
+    "Explain why tool calling separates model decision-making from application-side execution.",
+    "Read the core tool-selection equation and explain every symbol.",
+    "Compare single-agent loops, ReAct-style reasoning/action workflows, learned tool-use behavior, handoffs, and multi-agent orchestration at a practical level.",
+    "Diagnose production failure modes such as wrong tool choice, malformed arguments, looping, permission leaks, stale observations, unverified final answers, and tool overuse.",
+  ],
+  outcomes: [
+    "You can design a tool-using agent without treating autonomy as magic.",
+    "You can write narrow tool contracts and reason about validation, permissions, human approval, tracing, and stop conditions.",
+    "You can evaluate whether an agent succeeded by inspecting the workflow, not just the final answer.",
+  ],
+  sources: [
+    {
+      label: "Yao et al., ReAct: Synergizing Reasoning and Acting in Language Models",
+      href: "https://arxiv.org/abs/2210.03629",
+    },
+    {
+      label: "Schick et al., Toolformer: Language Models Can Teach Themselves to Use Tools",
+      href: "https://arxiv.org/abs/2302.04761",
+    },
+    {
+      label: "Anthropic, Building Effective Agents",
+      href: "https://www.anthropic.com/engineering/building-effective-agents",
+    },
+    {
+      label: "OpenAI function calling guide",
+      href: "https://platform.openai.com/docs/guides/function-calling",
+    },
+    {
+      label: "OpenAI Agents guide",
+      href: "https://platform.openai.com/docs/guides/agents",
+    },
+    {
+      label: "OpenAI Agents SDK docs",
+      href: "https://openai.github.io/openai-agents-js/guides/agents/",
+    },
+    {
+      label: "LangGraph overview",
+      href: "https://docs.langchain.com/oss/python/langgraph/overview",
+    },
+    {
+      label: "Model Context Protocol introduction",
+      href: "https://modelcontextprotocol.io/docs/getting-started/intro",
+    },
+  ],
+};
+
+export const dataPipelinesLesson: LessonMeta = {
+  slug: "data-pipelines",
+  title: "Data Pipelines",
+  level: "Builder",
+  prerequisites: [
+    "Complete RAG Systems first, or know what documents, chunks, embeddings, evaluation sets, and model outputs are",
+    "No database or distributed-systems background required",
+    "Comfort with tables and JSON helps, but schemas and validation are explained from first principles",
+  ],
+  tags: ["Data", "Pipelines", "Validation", "Evaluation", "Production AI"],
+  objectives: [
+    "Define pipeline, raw data, dataset, artifact, schema, validation, transformation, batch pipeline, streaming pipeline, lineage, data versioning, label noise, data leakage, drift, and feedback loop from first principles.",
+    "Trace how source data becomes a retrieval index, fine-tuning dataset, evaluation set, or monitoring signal.",
+    "Explain why validation checks should run before data reaches model training or user-facing retrieval.",
+    "Read simple data quality equations and explain every symbol.",
+    "Design beginner-friendly schema checks for text, labels, metadata, and split membership.",
+    "Diagnose common production failures such as stale indexes, schema drift, duplicate examples, label leakage, privacy leakage, and broken joins.",
+  ],
+  outcomes: [
+    "You can explain why AI systems depend on repeatable, validated, versioned data paths.",
+    "You can design a small data pipeline for retrieval, fine-tuning, evaluation, or monitoring.",
+    "You can identify data failures that make otherwise strong models behave badly in production.",
+  ],
+  sources: [
+    {
+      label: "Baylor et al., TFX: A TensorFlow-Based Production-Scale Machine Learning Platform",
+      href: "https://research.google/pubs/tfx-a-tensorflow-based-production-scale-machine-learning-platform/",
+    },
+    {
+      label: "Gebru et al., Datasheets for Datasets",
+      href: "https://arxiv.org/abs/1803.09010",
+    },
+    {
+      label: "TensorFlow Data Validation documentation",
+      href: "https://www.tensorflow.org/tfx/data_validation/install",
+    },
+    {
+      label: "TensorFlow Extended GitHub repository",
+      href: "https://github.com/tensorflow/tfx",
+    },
+    {
+      label: "Great Expectations data validation documentation",
+      href: "https://docs.greatexpectations.io/docs/guides/validation/validate_data_overview/",
+    },
+    {
+      label: "Dagster documentation",
+      href: "https://docs.dagster.io/",
+    },
+    {
+      label: "Sambasivan et al., Data Cascades in High-Stakes AI",
+      href: "https://research.google/pubs/everyone-wants-to-do-the-model-work-not-the-data-work-data-cascades-in-high-stakes-ai/",
     },
   ],
 };
@@ -149,11 +326,25 @@ export const topics: Topic[] = [
       "Grounded generation and citation",
       "Evaluation for answer faithfulness",
     ],
+    buildPath: [
+      "Create a small docs folder in VS Code and write an ingestion script that loads each file with its URL and title.",
+      "Split the documents into chunks, attach metadata, and store embeddings in a local or managed vector index.",
+      "Build a query route that retrieves evidence, assembles a citation prompt, and refuses when evidence is missing.",
+      "Write retrieval and answer-evaluation cases before changing chunk size, embedding model, reranker, or prompt rules.",
+    ],
     capstone: "Build a cited technical-support assistant over a document library.",
     sources: [
       {
         label: "Lewis et al., Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
         href: "https://arxiv.org/abs/2005.11401",
+      },
+      {
+        label: "LlamaIndex introduction to RAG",
+        href: "https://developers.llamaindex.ai/python/framework/understanding/rag/",
+      },
+      {
+        label: "LangChain retrieval documentation",
+        href: "https://docs.langchain.com/oss/python/langchain/retrieval",
       },
     ],
   },
@@ -172,8 +363,18 @@ export const topics: Topic[] = [
       "Tracing and observability",
       "Safety boundaries for autonomous actions",
     ],
+    buildPath: [
+      "Open VS Code and create a small TypeScript or Python project with one read-only tool, such as `search_docs` or `get_order_status`.",
+      "Define a strict schema for that tool, validate model-requested arguments, and return structured observations.",
+      "Wrap the model call in a step-limited loop that can call tools, record traces, handle tool errors, and stop with a final answer.",
+      "Add human approval for any write action before you add more tools, memory, handoffs, or multi-agent orchestration.",
+    ],
     capstone: "Create a research agent that gathers sources, drafts a plan, and records traceable decisions.",
     sources: [
+      {
+        label: "Anthropic, Building Effective Agents",
+        href: "https://www.anthropic.com/engineering/building-effective-agents",
+      },
       {
         label: "OpenAI Agents guide",
         href: "https://platform.openai.com/docs/guides/agents",
@@ -181,6 +382,14 @@ export const topics: Topic[] = [
       {
         label: "OpenAI Agents SDK docs",
         href: "https://openai.github.io/openai-agents-js/guides/agents/",
+      },
+      {
+        label: "LangGraph overview",
+        href: "https://docs.langchain.com/oss/python/langgraph/overview",
+      },
+      {
+        label: "Model Context Protocol introduction",
+        href: "https://modelcontextprotocol.io/docs/getting-started/intro",
       },
     ],
   },
@@ -199,6 +408,12 @@ export const topics: Topic[] = [
       "Evaluation sets",
       "Regression risk and model drift",
     ],
+    buildPath: [
+      "Collect a small set of high-quality examples that represent the stable behavior you want.",
+      "Create train, validation, and test splits, then check for duplicates and sensitive information.",
+      "Run a baseline with prompting or RAG first so fine-tuning has a real comparison point.",
+      "Fine-tune only after the evaluation set can catch regressions in correctness, style, safety, and cost.",
+    ],
     capstone: "Prepare a fine-tuning dataset and evaluation plan for a domain-specific assistant.",
     sources: [
       {
@@ -208,6 +423,14 @@ export const topics: Topic[] = [
       {
         label: "OpenAI fine-tuning API reference",
         href: "https://platform.openai.com/docs/api-reference/fine-tuning",
+      },
+      {
+        label: "Hugging Face PEFT documentation",
+        href: "https://huggingface.co/docs/peft/index",
+      },
+      {
+        label: "Hugging Face TRL supervised fine-tuning documentation",
+        href: "https://huggingface.co/docs/trl/en/sft_trainer",
       },
     ],
   },
@@ -226,11 +449,25 @@ export const topics: Topic[] = [
       "Permission boundaries",
       "Human review points",
     ],
+    buildPath: [
+      "Start with one narrow tool contract and document when it should and should not be called.",
+      "Validate every argument in code before execution, including IDs, enum values, permissions, and tenant boundaries.",
+      "Log tool calls, arguments, validation errors, observations, and final answers for review.",
+      "Add reusable skill instructions only after the workflow is stable enough to test repeatedly.",
+    ],
     capstone: "Define a tool-use workflow for editing documents without leaking private data.",
     sources: [
       {
         label: "OpenAI function calling guide",
         href: "https://platform.openai.com/docs/guides/function-calling",
+      },
+      {
+        label: "Anthropic tool-use guidance in Building Effective Agents",
+        href: "https://www.anthropic.com/engineering/building-effective-agents",
+      },
+      {
+        label: "Model Context Protocol introduction",
+        href: "https://modelcontextprotocol.io/docs/getting-started/intro",
       },
     ],
   },
@@ -249,11 +486,29 @@ export const topics: Topic[] = [
       "Prompt and dataset versioning",
       "Monitoring, traces, and cost controls",
     ],
+    buildPath: [
+      "Serve one AI workflow behind an API route with explicit model, prompt, and tool versions.",
+      "Record latency, token usage, retrieval/tool calls, errors, and user-visible outcomes for every request.",
+      "Add caching or batching only after measuring which stage dominates cost or latency.",
+      "Create release checks that compare new model, prompt, data, or tool versions against a frozen evaluation set.",
+    ],
     capstone: "Design an evaluation and monitoring plan for a production AI assistant.",
     sources: [
       {
         label: "OpenAI production best practices",
         href: "https://platform.openai.com/docs/guides/production-best-practices",
+      },
+      {
+        label: "OpenTelemetry GenAI semantic conventions",
+        href: "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+      },
+      {
+        label: "MLflow GenAI tracing documentation",
+        href: "https://www.mlflow.org/docs/latest/genai/tracing/",
+      },
+      {
+        label: "Anthropic evaluation tool documentation",
+        href: "https://platform.claude.com/docs/en/test-and-evaluate/eval-tool",
       },
     ],
   },
