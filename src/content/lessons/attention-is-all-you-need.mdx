@@ -1,0 +1,835 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This is a guided reading of the 2017 paper "Attention Is All You Need" by Vaswani et al. The goal is not to memorize the Transformer diagram. The goal is to understand why each design choice exists, what math it uses, what problem it solved in 2017, and why the same ideas still appear inside modern language models, retrieval systems, coding models, multimodal models, and AI infrastructure.
+
+We will move in the same order as the paper:
+
+1. The problem: sequence transduction was dominated by recurrent and convolutional models.
+2. The proposal: remove recurrence and convolution, and use attention as the main information-routing mechanism.
+3. The architecture: encoder stack, decoder stack, attention blocks, feed-forward blocks, residual connections, layer normalization, embeddings, and positional encodings.
+4. The math: scaled dot-product attention, multi-head attention, feed-forward networks, positional encodings, and the learning-rate schedule.
+5. The evidence: translation results, cost comparison, and ablation studies.
+6. The professional meaning: when Transformers help, where they are expensive, and what can go wrong in production systems.
+
+<CheckUnderstanding prompt="Before reading: what should you be able to do by the end?">
+You should be able to explain the Transformer as an information-routing architecture. You should also be able to read the paper's core equations, explain every symbol, describe the encoder and decoder data flow, reason about why self-attention parallelizes, and identify the main tradeoff: full self-attention gives short paths between tokens but costs roughly quadratic work in sequence length.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define sequence transduction, token, embedding, vector, hidden state, attention, self-attention, encoder, decoder, autoregressive generation, softmax, residual connection, layer normalization, dropout, and label smoothing.
+- Explain why recurrent neural networks were slow to train on long sequences.
+- Trace a token representation through the Transformer encoder and decoder.
+- Compute the shape and meaning of `Q`, `K`, `V`, `QK^T`, `softmax`, and the final value mixture.
+- Explain why dot products are scaled by `sqrt(d_k)`.
+- Explain why multi-head attention is not just "more attention," but parallel attention in different learned representation subspaces.
+- Explain why positional encodings are needed when a model has no recurrence or convolution.
+- Interpret the complexity table comparing self-attention, recurrence, and convolution.
+- Read the training setup: data, batching, optimizer, warmup schedule, dropout, label smoothing, checkpoint averaging, beam search, and Bilingual Evaluation Understudy (BLEU).
+- Connect the paper to modern professional systems: long-context cost, masking bugs, attention implementation efficiency, evaluation, and serving tradeoffs.
+
+## Prerequisites from zero
+
+You do not need prior machine learning experience, but you need a few building blocks.
+
+- A <GlossaryTerm term="sequence">an ordered list of items.</GlossaryTerm> A sentence is a sequence of words or word pieces. A generated answer is also a sequence.
+- A <GlossaryTerm term="sequence transduction">the task of turning one sequence into another sequence.</GlossaryTerm> Machine translation is the paper's main example: input is an English sentence, output is a German or French sentence.
+- A <GlossaryTerm term="token">a small unit a model processes.</GlossaryTerm> A token can be a word, part of a word, punctuation mark, or special symbol.
+- A <GlossaryTerm term="vector">a list of numbers used to represent something.</GlossaryTerm> Neural networks operate on numbers, so text must become vectors before the model can compute with it.
+- An <GlossaryTerm term="embedding">a learned vector representation of a token.</GlossaryTerm> If a model learns useful embeddings, tokens used in similar ways often have related vectors.
+- A <GlossaryTerm term="matrix">a rectangular table of numbers.</GlossaryTerm> A matrix lets the model process many vectors at once using optimized linear algebra.
+- A <GlossaryTerm term="parameter">a number learned during training.</GlossaryTerm> The model adjusts parameters so its predictions improve on training data.
+- A <GlossaryTerm term="probability distribution">a set of nonnegative numbers that sum to 1.</GlossaryTerm> The model uses distributions to represent uncertainty over possible next tokens.
+
+The paper assumes the reader already knows these ideas. This lesson will not.
+
+## The paper's central claim
+
+Before the Transformer, strong sequence models usually combined an <GlossaryTerm term="encoder">a network that reads the input sequence and produces useful internal representations.</GlossaryTerm> with a <GlossaryTerm term="decoder">a network that produces the output sequence.</GlossaryTerm> The dominant encoder-decoder systems often used recurrent neural networks or convolutional neural networks, sometimes with an attention mechanism added on top.
+
+The Transformer made a sharper claim: attention can be the core architecture, not just an add-on.
+
+The title "Attention Is All You Need" means: for the translation tasks studied in the paper, the model can remove recurrence and convolution from the main sequence-processing path and rely on attention plus position-wise feed-forward networks.
+
+<ConceptDiagram type="transformer" />
+
+That claim mattered because it changed the engineering profile of sequence modeling. Instead of processing one position after another, the model can compare all token positions in parallel inside each attention layer. This made training more efficient on graphics processing units (GPUs), which are very good at large matrix multiplications.
+
+## Paper reading map
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Paper section</th>
+        <th>What it contributes</th>
+        <th>What you should learn</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Abstract and Introduction</td>
+        <td>The motivation: existing models were strong but sequential and slow.</td>
+        <td>Why parallelization and long-range dependency paths mattered.</td>
+      </tr>
+      <tr>
+        <td>Background</td>
+        <td>The comparison set: recurrent, convolutional, and earlier attention models.</td>
+        <td>What makes self-attention different from attention attached to a recurrent network.</td>
+      </tr>
+      <tr>
+        <td>Model Architecture</td>
+        <td>The encoder-decoder Transformer design.</td>
+        <td>How representations move through attention, feed-forward layers, residual paths, and normalization.</td>
+      </tr>
+      <tr>
+        <td>Why Self-Attention</td>
+        <td>The complexity argument.</td>
+        <td>Why self-attention has short paths but high long-sequence cost.</td>
+      </tr>
+      <tr>
+        <td>Training</td>
+        <td>The data, batching, optimizer, schedule, and regularization.</td>
+        <td>How the architecture was made trainable in practice.</td>
+      </tr>
+      <tr>
+        <td>Results and Variations</td>
+        <td>Translation scores, cost estimates, and ablations.</td>
+        <td>Which components mattered empirically and how the authors tested them.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: Why recurrence was a bottleneck
+
+The introduction starts from a practical problem. A <GlossaryTerm term="recurrent neural network">a network that processes a sequence step by step while carrying a hidden state forward.</GlossaryTerm> reads a sequence in order. For a sentence with positions `1, 2, 3, ..., n`, the recurrent model computes one hidden state per position.
+
+<EquationBlock title="Recurrent sequence computation" equation={"h_t = f(h_{t-1}, x_t)"}>
+`h_t` is the hidden state at position `t`. A hidden state is the model's internal memory after reading up to that point. `h_{t-1}` is the previous hidden state. `x_t` is the input representation at the current position. `f` is the learned neural network function that combines the previous state with the current input.
+</EquationBlock>
+
+The important dependency is `h_t` depends on `h_{t-1}`. That means the model cannot compute all positions at the same time within one example. It must wait for position `1` before position `2`, and position `2` before position `3`.
+
+This creates two problems.
+
+First, training is less parallel. GPUs are fastest when they can do many similar numerical operations at once. Sequential dependency limits that.
+
+Second, long-distance relationships are hard. If a word near the end of a sentence depends on a word near the beginning, the signal may have to pass through many recurrent steps. Long paths can make learning unstable or inefficient.
+
+Concrete example:
+
+> "The book that the students who studied late returned was expensive."
+
+To understand "was," the model needs to know that the subject is "book," not "students." In a recurrent model, information about "book" has to survive several processing steps. In a Transformer self-attention layer, the representation at "was" can directly compare itself with "book" in one layer.
+
+<CheckUnderstanding prompt="Why does recurrence make training less parallel?">
+Because each hidden state depends on the previous hidden state. The model cannot compute position `t` until it has computed position `t - 1`, so positions inside a single sequence are tied to an ordered chain of computation.
+</CheckUnderstanding>
+
+## Section 2: What background problem the Transformer solves
+
+The paper compares Transformers against three broad families:
+
+- Recurrent models, which process tokens in a sequence of time steps.
+- Convolutional models, which process local windows and need multiple layers or dilation to connect distant positions.
+- Attention-augmented models, which already used attention but usually kept recurrence or convolution as the main backbone.
+
+A <GlossaryTerm term="convolutional neural network">a network that applies the same local pattern detector across positions.</GlossaryTerm> can process positions in parallel, but a small convolution only sees nearby tokens. To connect far-apart tokens, the network needs more layers, wider kernels, or dilated patterns.
+
+The Transformer uses <GlossaryTerm term="self-attention">attention where queries, keys, and values all come from the same sequence.</GlossaryTerm> In the encoder, each input position can attend to every input position. In the decoder, each output position can attend to earlier output positions, and also to the encoder output.
+
+The professional point is subtle: the paper is not just saying "attention works." It is saying attention can replace the sequential or local operation that previously moved information through the sequence.
+
+## Section 3: The encoder-decoder frame
+
+Most translation systems in the paper's era used the same high-level frame:
+
+1. The encoder reads the source sentence.
+2. The encoder produces a sequence of continuous vector representations.
+3. The decoder produces the target sentence one token at a time.
+4. Each decoder step uses previous target tokens and information from the encoder.
+
+The paper writes the input sequence as:
+
+<EquationBlock title="Input sequence" equation={"(x_1, ..., x_n)"}>
+`x_1` through `x_n` are the input symbols or token representations. `n` is the input sequence length. In translation, this might be the number of source-language tokens.
+</EquationBlock>
+
+The encoder maps those inputs to:
+
+<EquationBlock title="Encoder output sequence" equation={"z = (z_1, ..., z_n)"}>
+`z` is the full sequence of encoder outputs. Each `z_i` is a vector representation for input position `i` after the encoder has mixed information across the sentence.
+</EquationBlock>
+
+The decoder then generates:
+
+<EquationBlock title="Output sequence" equation={"(y_1, ..., y_m)"}>
+`y_1` through `y_m` are output symbols. `m` is the output sequence length. In translation, the output length can differ from the input length.
+</EquationBlock>
+
+The decoder is <GlossaryTerm term="autoregressive">it generates the next item using earlier generated items.</GlossaryTerm> If it is predicting token `y_i`, it can use `y_1` through `y_{i-1}`, but it must not use future target tokens.
+
+That is why masking exists. Masking is not decoration. It enforces the rule that generation cannot peek at the answer.
+
+## Section 3.1: Encoder stack from the paper
+
+The original Transformer encoder has `N = 6` identical layers. Each layer contains two sub-layers:
+
+<figure className="paper-figure" aria-label="Figure 1 from the paper showing the Transformer architecture">
+  <img
+    src="/papers/attention-figure-1-transformer-architecture.png"
+    alt="The original Transformer architecture diagram from the paper, showing the encoder stack on the left, decoder stack on the right, positional encodings, embeddings, multi-head attention, feed-forward layers, add and norm blocks, output linear layer, and softmax."
+  />
+</figure>
+
+1. Multi-head self-attention.
+2. A position-wise fully connected feed-forward network.
+
+Every sub-layer is wrapped with a residual connection and layer normalization.
+
+<EquationBlock title="Residual connection followed by layer normalization" equation={"LayerNorm(x + Sublayer(x))"}>
+`x` is the input vector or matrix entering the sub-layer. `Sublayer(x)` is the transformation performed by attention or the feed-forward network. The `+` adds the original input back to the transformed output. `LayerNorm` normalizes the result so activations stay in a more stable range.
+</EquationBlock>
+
+A <GlossaryTerm term="residual connection">a path that adds a layer's input to its output.</GlossaryTerm> helps information and gradients move through deep networks. Without residual paths, later layers can accidentally destroy useful earlier information or become harder to train.
+
+<GlossaryTerm term="Layer normalization">a normalization method that rescales features inside each example.</GlossaryTerm> helps keep the numerical values manageable as representations pass through many layers.
+
+The paper sets `d_model = 512` for the base model. This means the main representation width is 512 numbers per token position. The embedding layers and sub-layers all produce this same width so residual additions are shape-compatible.
+
+Professional context: shape compatibility is a real implementation constraint. You cannot add two tensors unless their dimensions match or broadcast in a valid way. The paper's architecture keeps the main stream at `d_model` so residual connections are simple.
+
+## Section 3.1: Decoder stack from the paper
+
+The decoder also has `N = 6` layers, but each decoder layer has three sub-layers:
+
+1. Masked multi-head self-attention over the output tokens generated so far.
+2. Multi-head attention over the encoder output.
+3. A position-wise feed-forward network.
+
+The first attention block is masked because the decoder must preserve autoregressive generation. During training, the correct output sentence is known, but the model must be trained as if it only knows earlier target tokens at each position.
+
+The second attention block is encoder-decoder attention. Its queries come from the decoder, while its keys and values come from the encoder output. In plain language, the decoder asks: "Given what I have generated so far, which source-language positions should I use now?"
+
+<CheckUnderstanding prompt="What is the difference between encoder self-attention and encoder-decoder attention?">
+Encoder self-attention uses queries, keys, and values from the input-side encoder stream. Encoder-decoder attention uses queries from the decoder stream, but keys and values from the encoder output, so the decoder can look back at the encoded source sentence.
+</CheckUnderstanding>
+
+## Section 3.2: Attention from zero
+
+Attention is a learned way to route information. One vector asks for information. Other vectors advertise what information they contain. The model computes match scores, turns those scores into weights, and uses the weights to mix content vectors.
+
+The paper describes attention as mapping a query and key-value pairs to an output.
+
+- A <GlossaryTerm term="query">a learned vector that represents what a position is looking for.</GlossaryTerm>
+- A <GlossaryTerm term="key">a learned vector that represents what a position can be matched by.</GlossaryTerm>
+- A <GlossaryTerm term="value">a learned vector that represents the information contributed if that position is attended to.</GlossaryTerm>
+- A <GlossaryTerm term="compatibility function">a scoring rule that says how well a query matches a key.</GlossaryTerm>
+
+<ConceptDiagram type="qkv" />
+
+Think about the sentence:
+
+> "The battery was old, so I replaced it."
+
+At the token "it," a useful query might search for an object that can be replaced. The key for "battery" might match that query strongly. The value for "battery" then contributes information to the representation of "it."
+
+This is not hard-coded. The model learns the projections that create queries, keys, and values during training.
+
+## Section 3.2.1: Scaled dot-product attention
+
+The core equation is the heart of the paper.
+
+<figure className="paper-figure paper-figure--wide" aria-label="Figure 2 from the paper showing scaled dot-product attention and multi-head attention">
+  <img
+    src="/papers/attention-figure-2-attention-mechanisms.png"
+    alt="The original attention diagram from the paper. The left side shows scaled dot-product attention with query and key matrix multiplication, scaling, optional masking, softmax, and value multiplication. The right side shows multi-head attention with linear projections of queries, keys, and values, parallel scaled dot-product attention heads, concatenation, and a final linear projection."
+  />
+</figure>
+
+<EquationBlock title="Scaled dot-product attention" equation={"Attention(Q, K, V) = softmax((QK^T) / sqrt(d_k))V"}>
+`Q` is the matrix of query vectors. `K` is the matrix of key vectors. `V` is the matrix of value vectors. `K^T` means the key matrix is transposed so every query can be compared with every key. `d_k` is the dimensionality of each key vector. `sqrt(d_k)` is the square root of that dimensionality. `softmax` turns scores into weights that sum to 1 across the keys. Multiplying by `V` uses those weights to mix the value vectors.
+</EquationBlock>
+
+Break it into four operations.
+
+### Step 1: Compute match scores
+
+<EquationBlock title="All query-key dot products" equation={"Scores = QK^T"}>
+Each entry in `Scores` compares one query with one key. If there are `n` tokens, this creates an `n` by `n` score matrix for self-attention. Row `i` says how much token `i` scores every token as a possible source of information.
+</EquationBlock>
+
+A <GlossaryTerm term="dot product">a way to compare two vectors by multiplying matching components and summing the results.</GlossaryTerm>
+
+<EquationBlock title="Dot product for one query and one key" equation={"q . k = q_1k_1 + q_2k_2 + ... + q_{d_k}k_{d_k}"}>
+`q` is one query vector. `k` is one key vector. `q_j` is component `j` of the query. `k_j` is component `j` of the key. The result is one scalar score. A scalar is a single number.
+</EquationBlock>
+
+If the dot product is high, the model treats the key as compatible with the query. If it is low, the model gives it less attention.
+
+### Step 2: Scale the scores
+
+The paper divides by `sqrt(d_k)`.
+
+<EquationBlock title="Scaled scores" equation={"ScaledScores = (QK^T) / sqrt(d_k)"}>
+`d_k` is the number of dimensions in each key and query vector. Dividing by `sqrt(d_k)` keeps the magnitude of scores from growing too large as the vectors get wider.
+</EquationBlock>
+
+Why does this matter? Suppose each component of `q` and `k` behaves roughly like a random variable with mean `0` and variance `1`. The dot product sums `d_k` products. The expected mean remains around `0`, but the variance grows with `d_k`.
+
+<EquationBlock title="Why unscaled dot products grow" equation={"q . k = sum_{j=1}^{d_k} q_j k_j\nVar(q . k) = d_k"}>
+`sum` means add across dimensions. `Var` means variance, a measure of how spread out values are. If the variance of the dot product grows with `d_k`, larger key dimensions can produce very large positive or negative scores.
+</EquationBlock>
+
+Large scores make softmax too sharp.
+
+### Step 3: Apply softmax
+
+<EquationBlock title="Softmax" equation={"softmax(s_i) = exp(s_i) / sum_j exp(s_j)"}>
+`s_i` is one score in a row of attention scores. `exp` means the exponential function. `sum_j exp(s_j)` adds the exponentials of all scores in the same row. The output is a nonnegative weight. All weights in that row sum to 1.
+</EquationBlock>
+
+Softmax turns raw scores into a probability-like distribution. If one score is much larger than the others, softmax can put almost all weight on one token. That may be useful sometimes, but if it happens too early or too often, gradients can become tiny for the ignored tokens.
+
+A <GlossaryTerm term="gradient">a signal that tells training how to change parameters to reduce error.</GlossaryTerm> If gradients become extremely small, learning slows down.
+
+### Step 4: Mix values
+
+<EquationBlock title="Weighted value mixture" equation={"Output = AttentionWeights V"}>
+`AttentionWeights` is the matrix produced by softmax. `V` is the matrix of value vectors. Each output vector is a weighted average of value vectors.
+</EquationBlock>
+
+This is the mechanism behind the phrase "a token attends to other tokens." More precisely: the token's query produces weights over keys, and those weights mix values into a new representation.
+
+<ConceptDiagram type="attention" />
+
+<Quiz
+  question="In scaled dot-product attention, what does `QK^T` produce?"
+  options={[
+    "A matrix of query-key compatibility scores.",
+    "The final vocabulary probabilities.",
+    "The positional encoding for each token.",
+  ]}
+  correctIndex={0}
+  explanation="`QK^T` compares every query with every key. Softmax and multiplication by `V` happen afterward."
+/>
+
+## A tiny numerical attention example
+
+Imagine one query attends over three keys. After the model computes and scales dot products, suppose the scores are:
+
+<EquationBlock title="Example attention scores" equation={"scores = [2.0, 1.0, -1.0]"}>
+There are three possible source tokens. The first has the strongest match, the second is weaker, and the third is a poor match.
+</EquationBlock>
+
+Softmax converts them into approximate weights:
+
+<EquationBlock title="Example softmax weights" equation={"softmax([2.0, 1.0, -1.0]) approx [0.705, 0.259, 0.035]"}>
+The weights are nonnegative and sum to about 1. The first token contributes most, the second contributes some, and the third contributes very little.
+</EquationBlock>
+
+If the three value vectors are `v_1`, `v_2`, and `v_3`, the output is:
+
+<EquationBlock title="Example value mixture" equation={"output approx 0.705v_1 + 0.259v_2 + 0.035v_3"}>
+The output is not a copied token. It is a new vector built from a weighted mixture of value vectors.
+</EquationBlock>
+
+This matters in professional debugging. If attention weights are unexpectedly concentrated on irrelevant tokens, the output representation can carry the wrong evidence. In modern systems, this is one reason engineers inspect attention patterns, retrieved context, and model outputs together rather than trusting one visualization alone.
+
+## Section 3.2.2: Multi-head attention
+
+One attention head gives one learned way to compare tokens. Multi-head attention gives several learned comparison spaces in parallel.
+
+<EquationBlock title="Multi-head attention" equation={"MultiHead(Q, K, V) = Concat(head_1, ..., head_h)W^O\nhead_i = Attention(QW_i^Q, KW_i^K, VW_i^V)"}>
+`h` is the number of heads. `head_i` is the output of attention head `i`. `W_i^Q`, `W_i^K`, and `W_i^V` are learned projection matrices for head `i`. `W^O` is the learned output projection after heads are concatenated. `Concat` means join the head outputs along the feature dimension.
+</EquationBlock>
+
+In the base Transformer:
+
+- `h = 8` heads.
+- `d_model = 512`.
+- `d_k = 64`.
+- `d_v = 64`.
+
+The paper uses `d_k = d_v = d_model / h`, so each head is narrower than the full model width. Because there are eight heads of width 64, the combined width returns to 512 after concatenation.
+
+Why not use one giant head? The paper's intuition is that a single attention operation averages information into one representation. Multiple heads let the model attend to different positions and representation subspaces at the same time.
+
+Concrete language example:
+
+- One head may attend from a pronoun to the noun it refers to.
+- Another head may attend from a verb to its subject.
+- Another may attend across punctuation or phrase boundaries.
+- Another may track local neighboring tokens.
+
+The paper does not claim heads are always cleanly interpretable, but it presents the possibility that attention patterns can expose some syntactic or semantic behavior.
+
+<CheckUnderstanding prompt="Why does multi-head attention keep computational cost similar to one full-width head in the paper's base model?">
+Each head uses a reduced dimension. With `h = 8` and `d_model = 512`, each head uses width `64`. Running eight narrower heads can have similar total cost to running one full-width attention operation, while giving the model multiple learned comparison spaces.
+</CheckUnderstanding>
+
+## Section 3.2.3: The three attention uses in the Transformer
+
+The paper uses multi-head attention in three places.
+
+### 1. Encoder self-attention
+
+Queries, keys, and values all come from the previous encoder layer. Every input position can attend to every input position.
+
+Professional meaning: this is how each input token becomes contextual. The representation of "bank" can change depending on whether nearby tokens mention money or rivers.
+
+### 2. Decoder masked self-attention
+
+Queries, keys, and values all come from the previous decoder layer, but future positions are masked.
+
+<EquationBlock title="Masking illegal future positions" equation={"masked_score = -infinity for future positions\nsoftmax(masked_score) = 0"}>
+When a score is set to negative infinity before softmax, its softmax weight becomes 0. That prevents the decoder from using future output tokens.
+</EquationBlock>
+
+Professional meaning: masking mistakes cause serious training and evaluation bugs. If future tokens leak into the decoder during training, the model may look excellent in training metrics while failing during real generation.
+
+### 3. Encoder-decoder attention
+
+Queries come from the decoder. Keys and values come from the encoder output. This lets each output position attend to the source sentence.
+
+Professional meaning: this is the translation alignment mechanism. When generating a German word, the decoder can focus on relevant English source positions.
+
+## Section 3.3: Position-wise feed-forward networks
+
+Attention lets positions communicate. The feed-forward network transforms each position independently after communication.
+
+The paper's feed-forward equation is:
+
+<EquationBlock title="Position-wise feed-forward network" equation={"FFN(x) = max(0, xW_1 + b_1)W_2 + b_2"}>
+`x` is the vector at one position. `W_1` and `W_2` are learned weight matrices. `b_1` and `b_2` are learned bias vectors. `max(0, ...)` is the Rectified Linear Unit (ReLU) activation, which replaces negative values with 0 and keeps positive values.
+</EquationBlock>
+
+The same feed-forward network is applied to every position in a layer. "Position-wise" means the model does not mix information across positions in this sub-layer. Cross-token mixing happened in attention. The feed-forward layer performs per-token transformation.
+
+In the base model:
+
+- Input and output width: `d_model = 512`.
+- Inner feed-forward width: `d_ff = 2048`.
+
+That means the feed-forward block expands each token vector from 512 dimensions to 2048 hidden dimensions, applies ReLU, then projects back to 512.
+
+Professional context: in many modern Transformer variants, feed-forward blocks contain a large share of the model's parameters and compute. Attention is conceptually famous, but the feed-forward layers are also a major part of model capacity.
+
+## Section 3.4: Embeddings and output probabilities
+
+The Transformer must convert discrete tokens into vectors.
+
+Input side:
+
+1. Token IDs are looked up in an embedding table.
+2. The model gets one `d_model`-dimensional vector per token.
+3. Positional encoding is added.
+4. The result enters the encoder.
+
+Output side:
+
+1. Previous output tokens are embedded.
+2. Positional encoding is added.
+3. The result enters the decoder.
+4. The decoder output is passed through a linear transformation.
+5. Softmax produces probabilities over possible next tokens.
+
+The paper shares the same weight matrix between source embeddings, target embeddings, and the pre-softmax linear transformation, following earlier work. It also multiplies embedding weights by `sqrt(d_model)`.
+
+Why share weights? It reduces parameters and ties the input and output token representation spaces together. In language modeling and translation, the same vocabulary items often benefit from related input and output representations.
+
+## Section 3.5: Positional encoding
+
+Self-attention alone has no built-in sense of order. If you give it the same token vectors in a different order, attention still compares token content, but the architecture itself does not know which token came first.
+
+Compare:
+
+- "dog bites person"
+- "person bites dog"
+
+The tokens are similar, but the meaning changes because the order changes. The model needs position information.
+
+The paper adds positional encodings to the token embeddings at the bottom of the encoder and decoder stacks.
+
+<ConceptDiagram type="positional" />
+
+The sinusoidal positional encoding is:
+
+<EquationBlock title="Sinusoidal positional encoding" equation={"PE(pos, 2i) = sin(pos / 10000^(2i / d_model))\nPE(pos, 2i + 1) = cos(pos / 10000^(2i / d_model))"}>
+`PE` is the positional encoding. `pos` is the token position in the sequence. `i` is the dimension index. `2i` refers to even dimensions. `2i + 1` refers to odd dimensions. `d_model` is the model width. `sin` and `cos` are sine and cosine functions.
+</EquationBlock>
+
+Each position receives a pattern of sine and cosine values at different frequencies. Nearby positions have related patterns. Farther positions have different patterns. The paper chose this fixed sinusoidal approach partly because it might generalize to sequence lengths longer than those seen during training.
+
+The authors also tested learned positional embeddings and found nearly identical results in their ablation table. That is important: the exact sinusoidal choice was not the only way to make the model work. The required idea is that position must enter somehow.
+
+Professional context: modern Transformers use several positional strategies, including learned absolute positions, relative positions, rotary position embeddings, and attention biases. The same problem remains: attention needs order information.
+
+## Section 4: Why self-attention
+
+The paper compares layer types using three criteria:
+
+1. Computational complexity per layer.
+2. How many sequential operations are required.
+3. Maximum path length between positions.
+
+A <GlossaryTerm term="path length">the number of computational steps information must travel between two positions.</GlossaryTerm> Shorter paths can make it easier for the model to learn long-range dependencies.
+
+The paper's complexity table can be read like this:
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Layer type</th>
+        <th>Complexity per layer</th>
+        <th>Sequential operations</th>
+        <th>Maximum path length</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Self-attention</td>
+        <td><code>O(n^2 * d)</code></td>
+        <td><code>O(1)</code></td>
+        <td><code>O(1)</code></td>
+      </tr>
+      <tr>
+        <td>Recurrent</td>
+        <td><code>O(n * d^2)</code></td>
+        <td><code>O(n)</code></td>
+        <td><code>O(n)</code></td>
+      </tr>
+      <tr>
+        <td>Convolutional</td>
+        <td><code>O(k * n * d^2)</code></td>
+        <td><code>O(1)</code></td>
+        <td><code>O(log_k(n))</code></td>
+      </tr>
+      <tr>
+        <td>Restricted self-attention</td>
+        <td><code>O(r * n * d)</code></td>
+        <td><code>O(1)</code></td>
+        <td><code>O(n / r)</code></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Symbol meanings:
+
+- `n` is sequence length.
+- `d` is representation dimension.
+- `k` is convolution kernel size.
+- `r` is the neighborhood size for restricted self-attention.
+- `O(...)` is Big O notation, a way to describe how cost grows as inputs grow.
+
+Self-attention's major advantage is path length. Any token can directly connect to any other token in one attention layer, so maximum path length is `O(1)`.
+
+Self-attention's major cost is the `n^2` term. Full attention compares every token with every other token. If sequence length doubles, the attention score matrix grows by about four times.
+
+<EquationBlock title="Why full attention is quadratic in sequence length" equation={"number_of_pairwise_scores = n * n = n^2"}>
+If there are `n` query positions and `n` key positions, every query compares with every key. That creates `n^2` scores per head before values are mixed.
+</EquationBlock>
+
+This tradeoff still shapes AI infrastructure. Long-context models, retrieval-augmented generation, chunking, memory systems, and efficient attention kernels all exist partly because full attention over very long sequences is expensive.
+
+<Quiz
+  question="What is the main long-context cost of full self-attention?"
+  options={[
+    "It compares every token with every other token, so the score matrix grows with `n^2`.",
+    "It cannot use matrix multiplication.",
+    "It removes the need for positional information.",
+  ]}
+  correctIndex={0}
+  explanation="Full self-attention creates all query-key pairs. This gives direct connections, but the score matrix grows quadratically with sequence length."
+/>
+
+## Section 5: Training data and batching
+
+The paper evaluates on machine translation.
+
+For English-to-German:
+
+- Dataset: WMT 2014 English-German.
+- Size: about 4.5 million sentence pairs.
+- Tokenization: byte-pair encoding.
+- Shared source-target vocabulary: about 37,000 tokens.
+
+For English-to-French:
+
+- Dataset: WMT 2014 English-French.
+- Size: about 36 million sentence pairs.
+- Tokenization: word-piece vocabulary.
+- Vocabulary size: about 32,000 word pieces.
+
+A <GlossaryTerm term="byte-pair encoding">a subword tokenization method that builds frequent character sequences into reusable token units.</GlossaryTerm> It helps handle rare words by breaking them into smaller known pieces.
+
+A <GlossaryTerm term="word piece">a subword unit used to represent words as smaller reusable parts.</GlossaryTerm> For example, an uncommon word can be split into pieces the model has seen before.
+
+The paper batches sentence pairs by approximate length. Each training batch contains about 25,000 source tokens and 25,000 target tokens. This matters because batching sequences of similar lengths reduces wasted padding.
+
+<GlossaryTerm term="padding">extra placeholder tokens added so sequences in the same batch have the same length.</GlossaryTerm> Too much padding wastes compute.
+
+Professional context: batching strategy can affect training speed, memory use, and stability. In production inference, batching also affects latency and throughput.
+
+## Section 5.2: Hardware and schedule
+
+The base models were trained on one machine with eight NVIDIA P100 GPUs. The paper reports:
+
+- Base model: 100,000 steps, about 12 hours.
+- Big model: 300,000 steps, about 3.5 days.
+
+This was a central part of the paper's impact. The Transformer did not merely achieve strong translation quality; it did so with much less training cost than many competing systems in the comparison table.
+
+Professional context: architecture quality is not only accuracy. Engineers also care about wall-clock training time, hardware cost, energy use, inference latency, memory footprint, and operational complexity.
+
+## Section 5.3: Optimizer and learning-rate schedule
+
+The paper uses the Adam optimizer.
+
+An <GlossaryTerm term="optimizer">an algorithm that updates model parameters during training.</GlossaryTerm> Adam is a popular optimizer that adapts update sizes using estimates of recent gradient behavior.
+
+The paper uses:
+
+- `beta_1 = 0.9`
+- `beta_2 = 0.98`
+- `epsilon = 10^-9`
+- `warmup_steps = 4000`
+
+The learning-rate schedule is:
+
+<EquationBlock title="Transformer learning-rate schedule" equation={"lrate = d_model^(-0.5) * min(step_num^(-0.5), step_num * warmup_steps^(-1.5))"}>
+`lrate` is the learning rate, which controls update size. `d_model` is the model width. `step_num` is the current training step. `warmup_steps` is the number of initial steps where the learning rate increases. `min(a, b)` chooses the smaller of `a` and `b`.
+</EquationBlock>
+
+This schedule does two things:
+
+1. During warmup, the learning rate increases roughly linearly.
+2. After warmup, the learning rate decreases in proportion to the inverse square root of the step number.
+
+Why warm up? Early in training, parameters are not yet organized. A very large learning rate can destabilize training. Warmup lets the model start cautiously, then train more aggressively, then decay.
+
+Professional context: learning-rate schedules are often as important as architecture details. A good architecture can fail with an unstable training recipe.
+
+## Section 5.4: Regularization
+
+<GlossaryTerm term="regularization">techniques that reduce overfitting and improve generalization.</GlossaryTerm> Overfitting happens when a model performs well on training data but poorly on new data.
+
+The paper uses three regularization ideas.
+
+### Residual dropout
+
+<GlossaryTerm term="dropout">a training technique that randomly drops parts of a network's activations.</GlossaryTerm> This discourages the model from relying too heavily on any single path.
+
+The base model uses dropout rate `P_drop = 0.1`.
+
+### Dropout on embeddings plus positional encodings
+
+The paper also applies dropout after token embeddings and positional encodings are added. This regularizes the earliest representations entering the encoder and decoder stacks.
+
+### Label smoothing
+
+<GlossaryTerm term="label smoothing">a training technique that makes the target distribution slightly less certain than a one-hot label.</GlossaryTerm>
+
+In ordinary classification, the target token might have probability `1.0`, and every other token has probability `0.0`. Label smoothing lowers the target probability a little and gives a small amount of probability mass to other tokens.
+
+The paper uses `epsilon_ls = 0.1`.
+
+Why do this? A model trained on perfectly sharp labels can become overconfident. Label smoothing can improve accuracy and BLEU even if it makes perplexity look worse.
+
+<GlossaryTerm term="perplexity">a metric related to how surprised a model is by the correct tokens.</GlossaryTerm> Lower perplexity usually means the model assigns higher probability to the correct sequence, but label smoothing can complicate direct interpretation because the model is trained not to be perfectly certain.
+
+## Section 6: Results
+
+The paper evaluates translation quality using <GlossaryTerm term="Bilingual Evaluation Understudy (BLEU)">an automatic metric that compares generated translations with reference translations using overlapping word or subword patterns.</GlossaryTerm>
+
+BLEU is not a perfect measure of translation quality. It can miss meaning, fluency, and acceptable paraphrases. But it was a standard benchmark metric for machine translation, so it allowed the authors to compare with prior systems.
+
+The headline results:
+
+- On WMT 2014 English-to-German, the big Transformer achieved 28.4 BLEU.
+- On WMT 2014 English-to-French, the big Transformer achieved 41.0 BLEU.
+- The base Transformer already surpassed many earlier published systems at lower estimated training cost.
+- The big Transformer beat prior single-model systems on English-to-French with less than one quarter of the training cost of the previous state-of-the-art model cited in the paper.
+
+The paper also uses checkpoint averaging and beam search.
+
+<GlossaryTerm term="checkpoint averaging">combining several saved model checkpoints to get a more stable final model.</GlossaryTerm>
+
+<GlossaryTerm term="beam search">a decoding algorithm that keeps several likely partial output sequences at each generation step instead of only the single best next token.</GlossaryTerm>
+
+The paper used beam size `4` and length penalty `alpha = 0.6`. A length penalty adjusts the score so the decoder does not unfairly prefer overly short or overly long translations.
+
+Professional context: evaluation results depend on training recipe and inference recipe. When comparing models, engineers need to ask: What data? What tokenization? What checkpoint selection? What decoding settings? What metric? What hardware cost?
+
+## Section 6.2: Model variations and ablations
+
+An <GlossaryTerm term="ablation study">an experiment that changes or removes parts of a system to see what matters.</GlossaryTerm> Ablations are how papers move from "this worked" to "these parts seem important."
+
+The paper varies several components.
+
+### Number of heads
+
+The base model uses 8 heads. The ablation table shows that 1 head performs worse. Too many heads can also hurt when each head becomes very narrow.
+
+Interpretation: multiple heads help, but not infinitely. There is a tradeoff between number of heads and dimension per head.
+
+### Key and value dimensions
+
+Reducing key size hurts quality. The paper suggests that compatibility between queries and keys is not trivial. The model needs enough representational room to decide what should attend to what.
+
+### Model size
+
+Bigger models generally perform better in the table. The big model uses:
+
+- `d_model = 1024`
+- `d_ff = 4096`
+- `h = 16`
+- about 213 million parameters
+
+The base model has about 65 million parameters.
+
+<GlossaryTerm term="parameter count">the number of learned numbers in a model.</GlossaryTerm> More parameters often increase capacity, but they also increase memory use, compute cost, and overfitting risk.
+
+### Dropout
+
+The ablations show dropout is helpful for avoiding overfitting. This is a reminder that architecture alone is not enough. The regularization recipe matters.
+
+### Positional encodings
+
+Replacing sinusoidal positional encodings with learned positional embeddings produced nearly identical results in the reported ablation. This supports the idea that position information is necessary, while the exact method can vary.
+
+<CheckUnderstanding prompt="What is the difference between a result table and an ablation table?">
+A result table compares the full model against other systems or benchmarks. An ablation table changes parts of the model or training setup to test which design choices matter and how sensitive performance is to those choices.
+</CheckUnderstanding>
+
+## What the paper did not solve
+
+The Transformer was a breakthrough, not a final answer.
+
+It did not eliminate sequential generation. The decoder still generates output tokens autoregressively, one position at a time, because token `y_i` depends on earlier generated tokens.
+
+It did not make long context free. Full self-attention has `O(n^2)` attention scores. Long documents, audio, video, and high-resolution images can make this expensive.
+
+It did not prove attention weights are always faithful explanations. Attention patterns can be informative, but a model's behavior is distributed across embeddings, projections, feed-forward layers, normalization, and decoding.
+
+It did not address all production evaluation issues. BLEU is useful for machine translation benchmarking, but production systems need task-specific evaluation, human review, robustness testing, latency measurement, cost tracking, and failure analysis.
+
+## Common misconceptions
+
+Misconception: "Attention is memory."
+
+Better view: attention is information routing over vectors available in the current computation. It can retrieve information from the current context, but it is not the same as a persistent database or long-term memory system.
+
+Misconception: "The Transformer has no order."
+
+Better view: raw self-attention is order-blind, so the architecture injects order through positional encodings or related mechanisms.
+
+Misconception: "Multi-head attention means heads manually represent grammar rules."
+
+Better view: heads are learned projections. Some heads may show interpretable patterns, but the model is not guaranteed to allocate one clean linguistic function per head.
+
+Misconception: "The paper is only about large language models."
+
+Better view: the paper studied machine translation. Later large language models adapted Transformer ideas, especially decoder-only autoregressive variants, at much larger scale and on broader data.
+
+Misconception: "Transformers are always better than recurrent or convolutional models."
+
+Better view: Transformers are extremely powerful, but architecture choice depends on data size, sequence length, latency constraints, hardware, inductive bias, and deployment setting.
+
+## Production failure modes to watch for
+
+- Masking bugs: the decoder or language model sees future tokens during training or evaluation.
+- Shape bugs: `Q`, `K`, `V`, head dimensions, batch dimensions, or residual dimensions do not line up.
+- Position bugs: positional encodings are missing, misaligned, truncated, or inconsistent between training and inference.
+- Padding bugs: attention attends to padding tokens because padding masks are wrong.
+- Long-context cost surprises: memory or latency grows sharply as sequence length increases.
+- Evaluation mismatch: the benchmark metric improves, but the user-facing task does not.
+- Overconfidence: the model assigns high confidence to wrong outputs, especially when regularization or calibration is weak.
+- Source confusion in retrieval systems: the model attends over irrelevant or low-quality context and produces fluent but unsupported answers.
+
+Professional engineers do not just ask whether attention works. They ask whether the attention implementation is correct, efficient, masked properly, evaluated honestly, and serving within cost and latency limits.
+
+## Interview-ready summary
+
+A Transformer turns tokens into vectors, adds position information, and repeatedly applies attention plus feed-forward transformations. In self-attention, each position creates a query, key, and value. Queries compare with keys through scaled dot products. Softmax turns those scores into weights. The weights mix values into new contextual representations. Multi-head attention performs this process several times in parallel in different learned projection spaces. Encoder layers use self-attention over the input. Decoder layers use masked self-attention over previous outputs and encoder-decoder attention over the source sequence. The architecture trains efficiently because positions in a layer can be processed in parallel, but full attention is expensive for long sequences because it compares every token with every other token.
+
+<CheckUnderstanding prompt="Explain the paper's core argument in your own words.">
+The paper argues that sequence transduction does not require recurrence or convolution as the main backbone. A stack of self-attention and feed-forward layers can model relationships between tokens, train more parallelly, and achieve strong translation results. The key tradeoff is that self-attention gives direct paths between positions but creates a pairwise attention matrix whose size grows quadratically with sequence length.
+</CheckUnderstanding>
+
+## Practice: trace one token through the encoder
+
+Use the sentence:
+
+> "The animal did not cross the street because it was tired."
+
+Trace the token "it."
+
+1. Tokenization turns the text into token IDs.
+2. The token ID for "it" becomes an embedding vector.
+3. A positional encoding is added so the model knows where "it" appears.
+4. In encoder self-attention, the "it" query compares with keys from all input positions.
+5. Tokens such as "animal" may receive high attention weights if useful for resolving reference.
+6. The weighted value mixture updates the representation of "it."
+7. The feed-forward network transforms the updated representation at that position.
+8. Residual connections preserve earlier information, and layer normalization stabilizes the representation.
+9. Repeating this across layers builds a richer contextual vector.
+
+<Quiz
+  question="Which statement best describes the encoder's output?"
+  options={[
+    "A sequence of contextual vectors, one per input position.",
+    "A single hard-coded grammar tree.",
+    "Only the final translated sentence.",
+  ]}
+  correctIndex={0}
+  explanation="The encoder maps input token representations to a sequence `z = (z_1, ..., z_n)`, where each `z_i` is contextualized by the encoder stack."
+/>
+
+## Practice: reason about costs
+
+Suppose a self-attention layer processes `n = 1,000` tokens. One head creates about:
+
+<EquationBlock title="Attention score count for 1,000 tokens" equation={"n^2 = 1000^2 = 1,000,000 scores"}>
+This is only the attention score matrix for one layer and one head, before considering batches, multiple heads, value mixing, feed-forward layers, or backpropagation during training.
+</EquationBlock>
+
+If `n = 2,000`, then:
+
+<EquationBlock title="Attention score count for 2,000 tokens" equation={"n^2 = 2000^2 = 4,000,000 scores"}>
+Doubling the sequence length quadruples the number of pairwise scores.
+</EquationBlock>
+
+This is why long context is an infrastructure problem, not just a modeling feature.
+
+## Final mastery checklist
+
+You should not need to read the paper separately to understand its main argument. Use this checklist to confirm that the lesson gave you the same core understanding in a more beginner-friendly path:
+
+- Explain the paper's claims about translation quality, parallelization, and training time.
+- Describe the sequential bottleneck that made recurrent models harder to parallelize.
+- Trace the residual-plus-normalization pattern around every Transformer sub-layer.
+- Write the scaled dot-product attention equation and label every symbol.
+- Explain how eight attention heads of width 64 relate to `d_model = 512`.
+- Explain why positional information must be added when recurrence and convolution are removed.
+- Distinguish path length from computational complexity.
+- Separate the architecture choices from the training recipe.
+- Use the ablation results to identify which design choices seem robust and which seem sensitive.
+
+## Sources
+
+<SourceCitation label="Attention Is All You Need paper" href="/papers/attention-is-all-you-need.pdf" />
+
+<SourceCitation label="Tensor2Tensor repository referenced by the paper" href="https://github.com/tensorflow/tensor2tensor" />
