@@ -7,6 +7,7 @@ import {
   fineTuningLesson,
   llmFoundationsLesson,
   ragSystemsLesson,
+  trainingRunsLesson,
   topics,
 } from "@/data/curriculum";
 
@@ -66,6 +67,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${baseUrl}/lessons/${dataPipelinesLesson.slug}`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/lessons/${trainingRunsLesson.slug}`,
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.9,

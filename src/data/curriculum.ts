@@ -329,12 +329,75 @@ export const dataPipelinesLesson: LessonMeta = {
   ],
 };
 
+export const trainingRunsLesson: LessonMeta = {
+  slug: "training-runs",
+  title: "Training Runs",
+  level: "Builder",
+  prerequisites: [
+    "Complete LLM Foundations and Data Pipelines first, or know what tokens, datasets, loss, validation splits, and evaluation sets are",
+    "No graphics processing unit or distributed training experience required",
+    "Comfort with simple arithmetic and reading charts helps, but every symbol is explained",
+  ],
+  tags: ["Training", "Optimization", "Checkpoints", "Experiment Tracking", "Evaluation"],
+  objectives: [
+    "Define training run, parameter, gradient, optimizer, learning rate, batch, epoch, step, checkpoint, validation loss, overfitting, underfitting, hyperparameter, seed, and experiment tracking from first principles.",
+    "Trace a training run from configuration and data loading through forward pass, loss, backpropagation, optimizer step, validation, checkpointing, and release decision.",
+    "Read the basic update equation and explain every symbol.",
+    "Interpret common loss-curve patterns and decide whether to stop, resume, lower the learning rate, clean data, or redesign the experiment.",
+    "Explain why compute budget, dataset size, model size, and training tokens are professional planning variables, not afterthoughts.",
+    "Diagnose run failures such as data leakage, exploding loss, unstable gradients, bad checkpoints, irreproducibility, weak baselines, and metric mismatch.",
+  ],
+  outcomes: [
+    "You can explain what happens during model training without treating the run as a black box.",
+    "You can read training logs, loss curves, validation metrics, checkpoints, and run configs well enough to debug a small model experiment.",
+    "You can design the minimum tracking and evaluation needed before a training run informs product or research decisions.",
+  ],
+  sources: [
+    {
+      label: "Kaplan et al., Scaling Laws for Neural Language Models",
+      href: "https://arxiv.org/abs/2001.08361",
+    },
+    {
+      label: "Brown et al., Language Models are Few-Shot Learners",
+      href: "https://arxiv.org/abs/2005.14165",
+    },
+    {
+      label: "Hoffmann et al., Training Compute-Optimal Large Language Models",
+      href: "https://arxiv.org/abs/2203.15556",
+    },
+    {
+      label: "PyTorch autograd tutorial",
+      href: "https://docs.pytorch.org/tutorials/beginner/introyt/autogradyt_tutorial.html",
+    },
+    {
+      label: "PyTorch saving and loading models tutorial",
+      href: "https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html",
+    },
+    {
+      label: "Hugging Face Trainer documentation",
+      href: "https://huggingface.co/docs/transformers/main_classes/trainer",
+    },
+    {
+      label: "TensorBoard scalars tutorial",
+      href: "https://www.tensorflow.org/tensorboard/scalars_and_keras",
+    },
+    {
+      label: "MLflow Tracking documentation",
+      href: "https://www.mlflow.org/docs/latest/ml/tracking",
+    },
+    {
+      label: "Weights & Biases experiment tracking documentation",
+      href: "https://docs.wandb.ai/guides/track/",
+    },
+  ],
+};
+
 export const fineTuningLesson: LessonMeta = {
   slug: "fine-tuning",
   title: "Fine-Tuning",
   level: "Builder",
   prerequisites: [
-    "Complete LLM Foundations and Data Pipelines first, or know what tokens, loss, datasets, validation splits, and evaluation sets are",
+    "Complete LLM Foundations, Data Pipelines, and Training Runs first, or know what tokens, loss, datasets, validation splits, and evaluation sets are",
     "No GPU training experience required",
     "Comfort with simple probability and matrices helps, but every symbol is explained",
   ],
@@ -413,7 +476,7 @@ export const aiSystemsLesson: LessonMeta = {
   title: "AI Systems",
   level: "Professional",
   prerequisites: [
-    "Complete LLM Foundations, RAG Systems, Agents and Tool Use, Data Pipelines, and Fine-Tuning first, or know what model calls, retrieval, tools, datasets, and evaluations are",
+    "Complete LLM Foundations, RAG Systems, Agents and Tool Use, Data Pipelines, Training Runs, and Fine-Tuning first, or know what model calls, retrieval, tools, datasets, and evaluations are",
     "No site reliability engineering background required",
     "Comfort with APIs, percentages, and simple arithmetic helps, but every operational metric is explained",
   ],

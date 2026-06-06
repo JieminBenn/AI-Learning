@@ -10,6 +10,7 @@ type ConceptDiagramProps = {
     | "positional"
     | "rag"
     | "dataPipeline"
+    | "trainingRun"
     | "fineTuning"
     | "aiSystem"
     | "agent";
@@ -260,6 +261,21 @@ export function ConceptDiagram({ type }: ConceptDiagramProps) {
           <div className="diagram-node accent">Validate and version</div>
           <div className="diagram-node">Transform for AI use</div>
           <div className="diagram-node output">Retrieve, train, evaluate, monitor</div>
+        </div>
+      </figure>
+    );
+  }
+
+  if (type === "trainingRun") {
+    return (
+      <figure className="concept-diagram training-run-diagram">
+        <figcaption>Training run lifecycle</figcaption>
+        <div className="diagram-grid compact">
+          <div className="diagram-node input">Config and data</div>
+          <div className="diagram-node">Forward pass</div>
+          <div className="diagram-node accent">Loss and gradients</div>
+          <div className="diagram-node">Validation and checkpoints</div>
+          <div className="diagram-node output">Candidate model</div>
         </div>
       </figure>
     );

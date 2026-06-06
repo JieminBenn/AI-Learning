@@ -1,0 +1,649 @@
+import { CheckUnderstanding } from "@/components/CheckUnderstanding";
+import { ConceptDiagram } from "@/components/ConceptDiagram";
+import { EquationBlock } from "@/components/EquationBlock";
+import { GlossaryTerm } from "@/components/GlossaryTerm";
+import { Quiz } from "@/components/Quiz";
+import { SourceCitation } from "@/components/SourceCitation";
+
+## How to read this lesson
+
+This lesson teaches training runs. A training run is one execution of a model-training experiment: one model, one dataset version, one set of settings, one stream of logs, and one set of saved checkpoints.
+
+The goal is not to make you an expert in large-scale distributed training on day one. The goal is to make training legible. When you see a chart of loss going down, a checkpoint folder, a learning rate, or a failed fine-tuning job, you should know what is happening and what questions to ask.
+
+We will move from intuition to professional practice:
+
+1. What a training run is.
+2. How one batch produces loss, gradients, and an optimizer update.
+3. Why learning rate, batch size, epochs, steps, seeds, and checkpoints matter.
+4. How to read training and validation curves.
+5. How teams track experiments so results are reproducible.
+6. How compute budgets shape model size, data size, and training tokens.
+7. What breaks in real training work and how engineers diagnose it.
+
+## Explain it in 5 minutes
+
+A model starts with learned numbers called <GlossaryTerm term="parameters">numbers inside a neural network that are adjusted during training.</GlossaryTerm> Training is the process of changing those numbers so the model makes better predictions on examples.
+
+In one simple training step:
+
+1. The training system loads a <GlossaryTerm term="batch">a small group of examples processed together.</GlossaryTerm>
+2. The model makes predictions for that batch.
+3. A <GlossaryTerm term="loss function">a formula that turns prediction error into one number.</GlossaryTerm> measures how wrong the predictions were.
+4. <GlossaryTerm term="Backpropagation">the algorithm that computes how each trainable parameter contributed to the loss.</GlossaryTerm> computes gradients.
+5. An <GlossaryTerm term="optimizer">an algorithm that updates parameters using gradients.</GlossaryTerm> changes the parameters.
+6. The system logs metrics, sometimes evaluates on a validation split, and sometimes saves a checkpoint.
+
+<ConceptDiagram type="trainingRun" />
+
+The loop repeats many times. A run is the full record of that loop: data version, code version, model architecture, hyperparameters, hardware, logs, metrics, checkpoints, and final decision.
+
+<EquationBlock title="One training update" equation={"theta_next = theta - learning_rate * gradient"}>
+`theta` means the current trainable parameters. `gradient` means the direction that increases the loss most quickly, computed by backpropagation. `learning_rate` is a small positive number that controls step size. The minus sign means the optimizer moves parameters in the direction that should reduce loss.
+</EquationBlock>
+
+This equation is the simplest version. Real optimizers such as AdamW keep extra moving averages and add details such as weight decay. But the professional intuition stays the same: each step uses recent error signals to move trainable weights.
+
+Training runs matter because many AI engineering decisions depend on them. A fine-tuning result is not just "we trained a model." It is "we trained model `M` on dataset version `D` with config `C`, watched metrics `X`, selected checkpoint `K`, compared against baseline `B`, and decided whether the improvement justified the cost and risk."
+
+<CheckUnderstanding prompt="What is the shortest accurate description of a training run?">
+A training run is one tracked execution of model training: code, data, configuration, optimization steps, metrics, checkpoints, and the decision about whether the resulting model is useful.
+</CheckUnderstanding>
+
+## Learning objectives
+
+By the end, you should be able to:
+
+- Define training run, parameter, gradient, optimizer, learning rate, batch, step, epoch, checkpoint, validation split, hyperparameter, seed, reproducibility, overfitting, underfitting, and experiment tracking.
+- Trace a batch through forward pass, loss, backpropagation, optimizer update, logging, validation, and checkpointing.
+- Read the basic gradient-descent update equation and explain every symbol.
+- Interpret common loss-curve patterns: healthy learning, underfitting, overfitting, instability, data leakage, and noisy validation.
+- Explain why checkpoints must save more than model weights when a run needs to resume.
+- Explain why model size, data size, tokens, and compute budget are linked.
+- Design a beginner-friendly run record that a teammate can reproduce.
+- Diagnose production-relevant failure modes before a trained model reaches users.
+
+## Prerequisites from zero
+
+You need these ideas before going further:
+
+- A <GlossaryTerm term="model">a function with learned parameters that maps inputs to outputs.</GlossaryTerm> For a language model, the input is tokens and the output is probabilities for possible next tokens.
+- A <GlossaryTerm term="token">a small text unit processed by a model, such as a word piece, punctuation mark, or special symbol.</GlossaryTerm>
+- A <GlossaryTerm term="dataset">a collection of examples used for training, validation, testing, retrieval, or evaluation.</GlossaryTerm>
+- A <GlossaryTerm term="split">a named subset of a dataset.</GlossaryTerm> Training examples teach the model. Validation examples help tune decisions during development. Test examples estimate performance after development choices are made.
+- A <GlossaryTerm term="metric">a measured number used to judge behavior.</GlossaryTerm> Loss, accuracy, latency, cost, and human preference scores are all metrics in different contexts.
+- A <GlossaryTerm term="baseline">the current or simpler system used for comparison.</GlossaryTerm> A training run is only meaningful if you can compare it to something.
+
+## Glossary of essential terms
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Term</th>
+        <th>Beginner definition</th>
+        <th>Professional meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Training run</td>
+        <td>One attempt to train a model.</td>
+        <td>A reproducible experiment with fixed code, data, config, logs, metrics, checkpoints, and decision records.</td>
+      </tr>
+      <tr>
+        <td>Step</td>
+        <td>One parameter update.</td>
+        <td>One optimizer update after a batch, or after several micro-batches when gradient accumulation is used.</td>
+      </tr>
+      <tr>
+        <td>Epoch</td>
+        <td>One pass through the training dataset.</td>
+        <td>A convenient counter for small datasets; large language-model pretraining is often planned by token count instead.</td>
+      </tr>
+      <tr>
+        <td>Learning rate</td>
+        <td>How big the update step is.</td>
+        <td>A sensitive hyperparameter or schedule that controls optimization stability and speed.</td>
+      </tr>
+      <tr>
+        <td>Gradient</td>
+        <td>A direction for changing parameters.</td>
+        <td>The partial derivatives of loss with respect to trainable parameters, computed by automatic differentiation.</td>
+      </tr>
+      <tr>
+        <td>Checkpoint</td>
+        <td>A saved training state.</td>
+        <td>Usually includes model weights, optimizer state, scheduler state, step or epoch, and enough metadata to resume or evaluate.</td>
+      </tr>
+      <tr>
+        <td>Hyperparameter</td>
+        <td>A setting chosen before or during training.</td>
+        <td>A run configuration value such as learning rate, batch size, number of steps, optimizer type, warmup, weight decay, seed, or data mix.</td>
+      </tr>
+      <tr>
+        <td>Experiment tracking</td>
+        <td>Keeping records of training attempts.</td>
+        <td>Logging configs, metrics, artifacts, code versions, data versions, and notes so runs can be compared and reproduced.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Section 1: What counts as a training run?
+
+A training run is more than the command that starts training. It is the unit of evidence for a model-building claim.
+
+If someone says, "Run 42 beat the baseline," a careful engineer asks:
+
+- What exact model architecture or base model was used?
+- What training data version was used?
+- Were validation and test examples kept separate from training examples?
+- What hyperparameters changed from the baseline?
+- Which checkpoint was selected, and why?
+- Did the model improve on the target metric without regressing on safety, latency, cost, or important edge cases?
+- Can someone reproduce the result from the recorded config?
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Run record field</th>
+        <th>What it answers</th>
+        <th>Why it matters</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Code version</td>
+        <td>What program trained the model?</td>
+        <td>A metric change may come from code, not model learning.</td>
+      </tr>
+      <tr>
+        <td>Data version</td>
+        <td>What examples did the model see?</td>
+        <td>Data leakage or cleanup can explain surprising gains.</td>
+      </tr>
+      <tr>
+        <td>Config</td>
+        <td>What settings controlled the run?</td>
+        <td>Learning rate, batch size, and schedule strongly affect outcomes.</td>
+      </tr>
+      <tr>
+        <td>Metrics</td>
+        <td>How did training and validation behave over time?</td>
+        <td>Curves show learning, instability, overfitting, and weak stopping choices.</td>
+      </tr>
+      <tr>
+        <td>Artifacts</td>
+        <td>What files did the run produce?</td>
+        <td>Checkpoints, logs, tokenizer files, and reports must match the model you evaluate.</td>
+      </tr>
+      <tr>
+        <td>Decision</td>
+        <td>What happened after the run?</td>
+        <td>Professional teams record whether a run shipped, failed, needs rerun, or informs the next experiment.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Official tools reflect this shape. Hugging Face `Trainer` exposes training arguments such as learning rate, batch size, logging strategy, evaluation strategy, save strategy, seeds, mixed precision, and checkpoint resume settings. MLflow and Weights & Biases organize work around runs, parameters, metrics, and artifacts. TensorBoard scalar plots show how metrics such as loss and learning rate change across training.
+
+<SourceCitation label="Hugging Face Trainer documentation" href="https://huggingface.co/docs/transformers/main_classes/trainer" />
+<SourceCitation label="MLflow Tracking documentation" href="https://www.mlflow.org/docs/latest/ml/tracking" />
+<SourceCitation label="Weights & Biases experiment tracking documentation" href="https://docs.wandb.ai/guides/track/" />
+<SourceCitation label="TensorBoard scalars tutorial" href="https://www.tensorflow.org/tensorboard/scalars_and_keras" />
+
+<Quiz
+  question="Which run record is most useful to a teammate?"
+  options={[
+    "A run name, exact code and data versions, config, metrics, artifacts, selected checkpoint, and release decision.",
+    "A screenshot of a loss curve with no data version or config.",
+    "A final model file with no information about how it was trained.",
+  ]}
+  correctIndex={0}
+  explanation="A professional run record lets another person compare, reproduce, audit, and debug the result."
+/>
+
+## Section 2: One batch, step by step
+
+The easiest way to understand training is to follow one batch.
+
+Imagine a tiny classifier that predicts whether a support ticket is about billing or shipping. One batch might contain 32 tickets and 32 correct labels. The model reads the tickets, produces predicted probabilities, and the loss function scores the predictions.
+
+For a language model, the same idea applies to tokens. The model sees earlier tokens and predicts the next token. The target is the actual next token from the training text or conversation example.
+
+The training loop has a standard shape:
+
+```python
+for batch in train_loader:
+    predictions = model(batch.inputs)
+    loss = loss_fn(predictions, batch.targets)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+This code is intentionally simplified. Real code adds device placement, mixed precision, gradient clipping, distributed synchronization, learning-rate schedules, logging, evaluation, checkpointing, and error handling. But these five lines contain the core loop.
+
+<EquationBlock title="Average batch loss" equation={"L_batch = (1 / B) * sum(loss_i for i = 1 to B)"}>
+`L_batch` is the loss for the batch. `B` is the number of examples in the batch. `loss_i` is the loss for one example. The formula averages individual errors so the optimizer receives one scalar value to differentiate.
+</EquationBlock>
+
+PyTorch's autograd system builds a computation graph during the forward pass and computes gradients during `loss.backward()`. The optimizer then uses those gradients to update parameters.
+
+<SourceCitation label="PyTorch autograd tutorial" href="https://docs.pytorch.org/tutorials/beginner/introyt/autogradyt_tutorial.html" />
+
+Beginner warning: lower training loss is not the same as a better product. A model can memorize training examples and still fail on new examples. That is why professional training work separates training metrics from validation, test, and task-specific evaluations.
+
+<CheckUnderstanding prompt="Why does a training loop call both `loss.backward()` and `optimizer.step()`?">
+`loss.backward()` computes gradients: how the loss changes with respect to trainable parameters. `optimizer.step()` uses those gradients to update the parameters.
+</CheckUnderstanding>
+
+## Section 3: Settings that shape the run
+
+Training behavior depends heavily on hyperparameters. A <GlossaryTerm term="hyperparameter">a setting chosen by the engineer rather than learned directly from data.</GlossaryTerm> Examples include learning rate, batch size, number of steps, optimizer, warmup schedule, weight decay, random seed, and validation frequency.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>Plain-language role</th>
+        <th>Common failure</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Learning rate</td>
+        <td>How large each update is.</td>
+        <td>Too high can make loss jump or diverge; too low can waste compute or stall.</td>
+      </tr>
+      <tr>
+        <td>Batch size</td>
+        <td>How many examples contribute to one update.</td>
+        <td>Too small can be noisy; too large can require more memory and may need learning-rate adjustment.</td>
+      </tr>
+      <tr>
+        <td>Number of steps</td>
+        <td>How long the optimizer updates parameters.</td>
+        <td>Too short underfits; too long can overfit or waste budget.</td>
+      </tr>
+      <tr>
+        <td>Warmup</td>
+        <td>A gradual increase in learning rate at the start.</td>
+        <td>Skipping warmup can destabilize large or sensitive runs.</td>
+      </tr>
+      <tr>
+        <td>Weight decay</td>
+        <td>A regularization pressure that discourages overly large weights.</td>
+        <td>Too much can underfit; too little can overfit depending on model and data.</td>
+      </tr>
+      <tr>
+        <td>Seed</td>
+        <td>A number used to initialize randomness.</td>
+        <td>Different seeds can produce different outcomes, especially for small datasets.</td>
+      </tr>
+      <tr>
+        <td>Evaluation frequency</td>
+        <td>How often the run measures validation behavior.</td>
+        <td>Too rare can miss the best checkpoint; too frequent can slow training.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Large language-model papers show that run settings are part of the research claim. The GPT-3 paper reports model sizes, batch sizes in tokens, learning rates, training data mixture, compute estimates, and evaluation setup. Scaling-law work studies how loss changes as model size, dataset size, and compute change. Chinchilla later argued that many large models were trained with too few tokens for their size and that compute-optimal planning should scale model size and training data together.
+
+<SourceCitation label="Brown et al., Language Models are Few-Shot Learners" href="https://arxiv.org/abs/2005.14165" />
+<SourceCitation label="Kaplan et al., Scaling Laws for Neural Language Models" href="https://arxiv.org/abs/2001.08361" />
+<SourceCitation label="Hoffmann et al., Training Compute-Optimal Large Language Models" href="https://arxiv.org/abs/2203.15556" />
+
+The practical lesson is simple: "we trained longer" is not automatically better. The right question is what changed: more examples, more tokens, more steps, different learning rate, different data mix, larger model, smaller model, better labels, new optimizer, or new evaluation.
+
+## Section 4: Validation and loss curves
+
+Training loss measures error on examples the model is learning from. Validation loss measures error on examples held out during development. The validation split is not used for parameter updates. It helps you decide whether the model is learning in a way that generalizes.
+
+<EquationBlock title="Generalization gap" equation={"gap = validation_loss - training_loss"}>
+`gap` is the difference between validation loss and training loss at a point in the run. If the gap grows while training loss keeps falling, the model may be overfitting: it is improving on training examples but not on held-out examples.
+</EquationBlock>
+
+Loss curves are diagnostic tools.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Pattern</th>
+        <th>What you might see</th>
+        <th>Likely interpretation</th>
+        <th>Next move</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Healthy learning</td>
+        <td>Training loss falls, validation loss falls, task metric improves.</td>
+        <td>The model is learning signal that transfers to held-out examples.</td>
+        <td>Keep training until validation plateaus or budget ends.</td>
+      </tr>
+      <tr>
+        <td>Underfitting</td>
+        <td>Both training and validation loss stay high.</td>
+        <td>The model, data, features, or training time may be insufficient.</td>
+        <td>Check labels, model capacity, learning rate, and number of steps.</td>
+      </tr>
+      <tr>
+        <td>Overfitting</td>
+        <td>Training loss falls but validation loss rises.</td>
+        <td>The model is fitting training examples too specifically.</td>
+        <td>Stop earlier, add data, regularize, reduce epochs, or improve splits.</td>
+      </tr>
+      <tr>
+        <td>Divergence</td>
+        <td>Loss jumps upward, becomes `NaN`, or oscillates violently.</td>
+        <td>The learning rate may be too high, gradients may be unstable, or data may contain bad values.</td>
+        <td>Lower learning rate, add gradient clipping, inspect batches, restart from a stable checkpoint.</td>
+      </tr>
+      <tr>
+        <td>Suspiciously perfect validation</td>
+        <td>Validation improves unrealistically fast or matches training too closely.</td>
+        <td>There may be duplicate examples, leakage, or evaluation code using training data.</td>
+        <td>Audit splits, deduplicate, and inspect evaluation examples manually.</td>
+      </tr>
+      <tr>
+        <td>Noisy validation</td>
+        <td>Validation metric jumps around from one eval to the next.</td>
+        <td>The validation set may be too small or the metric too variable.</td>
+        <td>Use more examples, aggregate repeated evals, or add task-specific metrics.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+For AI products, validation loss is rarely enough. A lower language-model loss may not mean the support assistant cites sources correctly, refuses unsafe requests, formats JSON reliably, or chooses tools correctly. Professional teams pair loss with task-specific evals and human review for high-risk behavior.
+
+<Quiz
+  question="A run's training loss keeps falling, but validation loss starts rising. What is the most likely concern?"
+  options={[
+    "Overfitting: the model is improving on training examples while getting worse on held-out examples.",
+    "The model is definitely ready to ship because training loss is lower.",
+    "The optimizer has stopped changing parameters.",
+  ]}
+  correctIndex={0}
+  explanation="The training/validation split exists to catch this exact situation. Falling training loss alone is not enough."
+/>
+
+## Section 5: Checkpoints and resuming
+
+A checkpoint is a saved training state. Beginners often think a checkpoint is just model weights. For inference, saving weights may be enough. For resuming training, it usually is not.
+
+A resumable checkpoint should preserve enough state for the next optimizer update to behave as if training had not stopped.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Checkpoint item</th>
+        <th>Why it matters</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Model weights</td>
+        <td>The learned parameters at the saved step.</td>
+      </tr>
+      <tr>
+        <td>Optimizer state</td>
+        <td>Optimizers such as Adam keep moving averages that affect future updates.</td>
+      </tr>
+      <tr>
+        <td>Scheduler state</td>
+        <td>The learning rate may depend on the current step, warmup, or decay schedule.</td>
+      </tr>
+      <tr>
+        <td>Step or epoch</td>
+        <td>The run needs to know where to continue and what has already been seen.</td>
+      </tr>
+      <tr>
+        <td>Random number generator state</td>
+        <td>Helps reproduce sampling, shuffling, dropout, and augmentation behavior.</td>
+      </tr>
+      <tr>
+        <td>Tokenizer or preprocessing config</td>
+        <td>The model must receive inputs in the same representation used during training.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+PyTorch's official saving guide makes this distinction: inference can often save a model state dictionary, while a general checkpoint for resuming training should include model state, optimizer state, epoch, loss, and other needed metadata.
+
+<SourceCitation label="PyTorch saving and loading models tutorial" href="https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html" />
+
+Professional checkpoint decisions include:
+
+- Save every fixed number of steps, every epoch, or whenever validation improves.
+- Keep only the best few checkpoints to control storage cost.
+- Record which checkpoint was evaluated and why it was selected.
+- Test loading before trusting the checkpoint.
+- Separate "best validation checkpoint" from "final checkpoint" when they differ.
+
+<CheckUnderstanding prompt="Why can resuming from only model weights change the training trajectory?">
+The optimizer and scheduler may have internal state. If those are missing, the next update can use a different effective learning rate or momentum history than the original run.
+</CheckUnderstanding>
+
+## Section 6: Experiment tracking and reproducibility
+
+Reproducibility means a teammate can rerun the experiment and get meaningfully comparable results. It does not always mean byte-for-byte identical results, especially with parallel hardware and nondeterministic kernels. But the run record should make differences explainable.
+
+A useful run name is not enough. Record the facts that determine behavior:
+
+```json
+{
+  "run_name": "support-sft-2026-06-06-lr-2e-5",
+  "code_commit": "abc1234",
+  "base_model": "example-model-7b",
+  "dataset_version": "support_examples_v3",
+  "train_examples": 4200,
+  "validation_examples": 600,
+  "optimizer": "AdamW",
+  "learning_rate": 0.00002,
+  "batch_size": 64,
+  "max_steps": 1200,
+  "seed": 42,
+  "selected_checkpoint": "checkpoint-950",
+  "ship_decision": "do not ship: regression on refund edge cases"
+}
+```
+
+This is not a perfect schema. It is the minimum mindset: record what changed, what was measured, what artifact was selected, and what decision followed.
+
+Experiment tracking tools help compare runs. MLflow Tracking records parameters, metrics, and artifacts. Weights & Biases tracks experiment configs and metrics over time. TensorBoard visualizes scalar metrics such as loss and learning rate. Hugging Face `Trainer` can report to tracking tools and handles common training-loop concerns.
+
+<EquationBlock title="Run comparison" equation={"candidate_wins only if metric_gain - regression_cost - added_operational_cost > 0"}>
+This is a decision rule, not a mathematical law. `metric_gain` means the measured improvement you care about. `regression_cost` means harm on other required behaviors. `added_operational_cost` means extra training, serving, storage, review, and maintenance burden.
+</EquationBlock>
+
+Professional context: reproducibility is not bureaucracy. It is how teams avoid arguing from memory. When a model improves, the run record helps you know why. When a model breaks, the run record narrows the search.
+
+## Section 7: Compute budgets and scaling laws
+
+Training consumes compute. Compute is the amount of numerical work performed by hardware such as graphics processing units (GPUs) or tensor processing units (TPUs). For language models, teams often plan around model parameters, training tokens, sequence length, batch size, number of steps, and hardware time.
+
+Large-model training is shaped by tradeoffs:
+
+- More parameters can increase model capacity but raise memory and inference cost.
+- More training tokens can improve learning but require more data processing and compute.
+- Longer context increases the amount of token information per example but can raise attention cost.
+- Larger batch sizes can improve hardware utilization but may change optimization behavior.
+- More steps can improve loss until the run plateaus or overfits.
+
+Scaling-law papers are empirical studies of how model performance changes with model size, data size, and compute. Kaplan et al. reported power-law relationships between loss and scale across model size, dataset size, and compute. Hoffmann et al. later argued that compute-optimal training should balance model size and data more evenly, and showed Chinchilla, a smaller model trained on more tokens than larger comparison models, outperforming them across many benchmarks under a comparable compute budget.
+
+The beginner lesson is not "memorize one ratio forever." The lesson is that training budget is an experimental design variable. Data, model size, and compute must be planned together, and conclusions depend on the task, architecture, data quality, hardware, and inference economics.
+
+<EquationBlock title="Simplified training cost intuition" equation={"training_cost grows with parameters * training_tokens"}>
+`parameters` is the number of learned weights being trained. `training_tokens` is how many token positions the model processes. This is a simplified intuition, not a full hardware cost formula. Real cost also depends on architecture, sequence length, optimizer, precision, parallelism, utilization, and checkpointing.
+</EquationBlock>
+
+<SourceCitation label="Kaplan et al., Scaling Laws for Neural Language Models" href="https://arxiv.org/abs/2001.08361" />
+<SourceCitation label="Hoffmann et al., Training Compute-Optimal Large Language Models" href="https://arxiv.org/abs/2203.15556" />
+
+For most product teams, the lesson appears at a smaller scale. A fine-tuning run with bad data is still bad if it is cheap. A run with excellent labels but no baseline cannot prove improvement. A run that improves one benchmark but doubles latency may be a poor product decision. Compute is one budget; evaluation quality is another.
+
+## Section 8: What can go wrong?
+
+Training failures are often ordinary engineering failures wearing machine-learning clothes. The model may be fine; the data, split, metric, logging, checkpoint, or comparison may be broken.
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Failure mode</th>
+        <th>Symptom</th>
+        <th>Diagnosis</th>
+        <th>Control</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Data leakage</td>
+        <td>Validation scores look too good.</td>
+        <td>Training examples may duplicate validation or test examples.</td>
+        <td>Deduplicate, keep split files versioned, and audit examples manually.</td>
+      </tr>
+      <tr>
+        <td>Bad labels</td>
+        <td>Loss plateaus or model learns unwanted behavior.</td>
+        <td>The target outputs may be inconsistent, incorrect, or ambiguous.</td>
+        <td>Review labels, add guidelines, and measure inter-reviewer agreement for subjective tasks.</td>
+      </tr>
+      <tr>
+        <td>Exploding loss</td>
+        <td>Loss becomes huge or `NaN`.</td>
+        <td>Learning rate, precision, gradients, or input values may be unstable.</td>
+        <td>Lower learning rate, inspect batches, use gradient clipping, and resume from a stable checkpoint.</td>
+      </tr>
+      <tr>
+        <td>Wrong metric</td>
+        <td>Training improves, but users see no benefit.</td>
+        <td>The metric does not represent the production behavior that matters.</td>
+        <td>Add task-specific evals, human review, and product-level measurements.</td>
+      </tr>
+      <tr>
+        <td>Checkpoint mismatch</td>
+        <td>Evaluated model does not match reported run.</td>
+        <td>The wrong checkpoint, tokenizer, adapter, or preprocessing config was loaded.</td>
+        <td>Record artifact IDs and test loading paths before evaluation.</td>
+      </tr>
+      <tr>
+        <td>Irreproducibility</td>
+        <td>A rerun cannot match the original result.</td>
+        <td>Seed, data version, package version, hardware, or code commit was missing.</td>
+        <td>Track run metadata and treat untracked runs as weak evidence.</td>
+      </tr>
+      <tr>
+        <td>Weak baseline</td>
+        <td>A trained model appears impressive but was compared to a poor prompt or old system.</td>
+        <td>The training run did not answer the real decision question.</td>
+        <td>Compare against a strong current baseline before claiming success.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<Quiz
+  question="A fine-tuned model beats the old baseline but fails current prompt-only evals. What should you conclude?"
+  options={[
+    "The training run is not yet justified; the candidate must beat a strong current baseline.",
+    "Fine-tuning always wins because training changed weights.",
+    "The validation split should be deleted so the trained model looks better.",
+  ]}
+  correctIndex={0}
+  explanation="Training is useful only when it improves the decision-relevant comparison. A weak baseline can make a poor training run look good."
+/>
+
+## Section 9: A beginner checklist before starting a run
+
+Before spending training budget, write down:
+
+- Goal: What behavior should improve?
+- Baseline: What current system must the run beat?
+- Data: What exact dataset version will train the model?
+- Splits: Which examples are train, validation, and test?
+- Config: What model, optimizer, learning rate, batch size, steps, seed, and schedule will be used?
+- Metrics: Which loss, task metrics, safety checks, and regression checks matter?
+- Logging: Where will parameters, metrics, curves, notes, and artifacts be recorded?
+- Checkpoints: How often will they be saved, and how will the best checkpoint be selected?
+- Stop rule: When should the run stop early, resume, or be declared failed?
+- Decision rule: What result is good enough to ship, and what result is only interesting?
+
+This checklist is intentionally plain. It prevents the most common beginner mistake: starting a run before the team knows what the run is supposed to prove.
+
+## Common misconceptions
+
+<div className="lesson-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Misconception</th>
+        <th>Correction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>"Lower training loss means the model is better."</td>
+        <td>Lower training loss can reflect memorization. Validation, test, and task-specific evals decide whether behavior improved.</td>
+      </tr>
+      <tr>
+        <td>"A checkpoint is just a model file."</td>
+        <td>A resumable checkpoint usually needs optimizer, scheduler, step, and metadata, not just weights.</td>
+      </tr>
+      <tr>
+        <td>"The best run is the one with the biggest model."</td>
+        <td>Model size, data size, compute, inference cost, and task needs trade off. Bigger is not automatically the best engineering choice.</td>
+      </tr>
+      <tr>
+        <td>"If a training job completes, the result is valid."</td>
+        <td>A completed run can still have leaked data, broken metrics, wrong checkpoints, or regressions.</td>
+      </tr>
+      <tr>
+        <td>"Reproducibility only matters in research."</td>
+        <td>Production teams need reproducibility to debug incidents, compare candidates, audit safety, and avoid shipping accidental regressions.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+## Practice checks
+
+1. You start a run and loss becomes `NaN` after 50 steps. Name three things to inspect before changing the model architecture.
+2. A run has better validation loss but worse JSON formatting reliability. Should it ship? Explain what additional evaluation is needed.
+3. You want to resume a run after a power outage. What checkpoint fields matter beyond model weights?
+4. A teammate claims a trained model improved because the final loss is lower than yesterday. What run-record fields do you need before trusting the claim?
+5. A small model trained on more high-quality tokens beats a larger model trained briefly. Which scaling-law intuition does this illustrate?
+
+## Additional implementation resources
+
+- PyTorch autograd tutorial: how gradients are computed and used in training.
+- PyTorch saving and loading guide: how to save weights and resumable checkpoints.
+- Hugging Face Trainer documentation: a widely used training loop abstraction for Transformer models.
+- TensorBoard scalars tutorial: how to visualize loss, metrics, and learning rate over time.
+- MLflow Tracking documentation: how to log parameters, metrics, and artifacts.
+- Weights & Biases experiment tracking documentation: how to compare and inspect runs.
+
+<SourceCitation label="PyTorch autograd tutorial" href="https://docs.pytorch.org/tutorials/beginner/introyt/autogradyt_tutorial.html" />
+<SourceCitation label="PyTorch saving and loading models tutorial" href="https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html" />
+<SourceCitation label="Hugging Face Trainer documentation" href="https://huggingface.co/docs/transformers/main_classes/trainer" />
+<SourceCitation label="TensorBoard scalars tutorial" href="https://www.tensorflow.org/tensorboard/scalars_and_keras" />
+<SourceCitation label="MLflow Tracking documentation" href="https://www.mlflow.org/docs/latest/ml/tracking" />
+<SourceCitation label="Weights & Biases experiment tracking documentation" href="https://docs.wandb.ai/guides/track/" />
+
+## What you should be able to say now
+
+A training run is a tracked experiment, not a magic event. Each batch creates predictions, loss, gradients, and an optimizer update. The run's configuration controls how those updates happen. Validation curves and task-specific evals show whether learning generalizes. Checkpoints preserve model and optimizer state so training can resume or the best candidate can be evaluated. Experiment tracking makes claims reproducible. Compute budgets connect model size, data size, training tokens, and cost.
+
+Most importantly: a training run is only useful if it answers a decision question. Did this model improve the behavior we care about, against a strong baseline, without unacceptable regressions?

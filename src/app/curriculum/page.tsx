@@ -11,6 +11,7 @@ import {
   llmFoundationsLesson,
   ragSystemsLesson,
   runnableProjects,
+  trainingRunsLesson,
   topics,
 } from "@/data/curriculum";
 
@@ -115,6 +116,9 @@ export default function CurriculumPage() {
             </Link>
             <Link className="button button--secondary" href="/lessons/data-pipelines">
               Continue to {dataPipelinesLesson.title} <ArrowRight aria-hidden="true" size={18} />
+            </Link>
+            <Link className="button button--secondary" href="/lessons/training-runs">
+              Continue to {trainingRunsLesson.title} <ArrowRight aria-hidden="true" size={18} />
             </Link>
             <Link className="button button--secondary" href="/lessons/fine-tuning">
               Continue to {fineTuningLesson.title} <ArrowRight aria-hidden="true" size={18} />
