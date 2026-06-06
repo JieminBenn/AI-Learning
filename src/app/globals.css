@@ -1379,9 +1379,212 @@ button {
   border-top: 1px solid var(--line);
 }
 
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.project-hero {
+  align-items: stretch;
+}
+
+.project-hero__panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  box-shadow: 0 8px 24px rgb(23 33 43 / 6%);
+}
+
+.project-hero__panel strong {
+  color: var(--teal-dark);
+  font-size: 0.9rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.project-hero__panel ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.project-hero__panel a:hover {
+  color: var(--teal-dark);
+}
+
+.project-track {
+  display: grid;
+  gap: 18px;
+}
+
+.project-card {
+  scroll-margin-top: 96px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) minmax(280px, 0.45fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+  box-shadow: 0 8px 24px rgb(23 33 43 / 6%);
+}
+
+.project-card__number {
+  display: grid;
+  place-items: start center;
+  padding-top: 24px;
+  border-right: 1px solid var(--line);
+  background: #f4f8f7;
+  color: var(--teal-dark);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 900;
+}
+
+.project-card__main,
+.project-card__sources {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  min-width: 0;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.project-card__sources {
+  border-left: 1px solid var(--line);
+  background: #f9fbfb;
+}
+
+.project-card__header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.project-card__header svg {
+  color: var(--teal);
+}
+
+.project-card__header span {
+  display: inline-flex;
+  margin-bottom: 6px;
+  color: var(--coral);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.project-card h2,
+.project-card h3 {
+  margin: 0;
+  line-height: 1.1;
+}
+
+.project-card h2 {
+  font-size: clamp(1.65rem, 3vw, 2.55rem);
+}
+
+.project-card h3 {
+  color: var(--teal-dark);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+
+.project-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.project-grid > section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.project-grid--compact > section {
+  background: #f9fbfb;
+}
+
+.file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-list code,
+.command-chip {
+  border: 1px solid #cfd8dc;
+  border-radius: var(--radius);
+  background: #f4f8f7;
+}
+
+.file-list code {
+  padding: 7px 9px;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.command-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--teal-dark);
+  font-weight: 900;
+}
+
+.command-chip code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.warning-list li svg {
+  color: var(--coral);
+}
+
+.project-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.project-summary-grid .learning-card {
+  min-height: 360px;
+}
+
 @media (max-width: 1100px) {
   .hero,
   .topic-hero,
+  .project-hero,
+  .project-card,
   .lesson-shell,
   .roadmap-layout,
   .curriculum-board,
@@ -1391,6 +1594,19 @@ button {
   .model-equation,
   .model-sources {
     grid-template-columns: 1fr;
+  }
+
+  .project-card__number {
+    place-items: center start;
+    min-height: 48px;
+    padding: 0 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .project-card__sources {
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 
   .topic-sidebar,
@@ -1513,6 +1729,7 @@ button {
   .path-grid,
   .topic-grid,
   .model-grid,
+  .project-grid,
   .model-dashboard,
   .model-flow,
   .diagram-grid,
@@ -1537,6 +1754,7 @@ button {
 
   .learning-card,
   .roadmap-card,
+  .project-card,
   .topic-card,
   .model-card,
   .lesson-content {

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { BrainCircuit, Home, Sparkles } from "lucide-react";
+import { BrainCircuit, FolderKanban, Home, Sparkles } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/models", label: "Models", icon: Sparkles },
 ];
 

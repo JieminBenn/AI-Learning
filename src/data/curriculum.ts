@@ -35,6 +35,25 @@ export type LearningModule = {
   milestones: string[];
 };
 
+export type RunnableProject = {
+  slug: string;
+  title: string;
+  level: "First build" | "Builder" | "Production gate";
+  summary: string;
+  lessonHref: string;
+  professionalOutcome: string;
+  prerequisites: string[];
+  build: string[];
+  starterFiles: string[];
+  runCommand: string;
+  evalChecks: string[];
+  failureModes: string[];
+  sources: {
+    label: string;
+    href: string;
+  }[];
+};
+
 export type ModelFamily = {
   name: string;
   family: string;
@@ -683,6 +702,260 @@ export const topics: Topic[] = [
       {
         label: "MLflow GitHub repository",
         href: "https://github.com/mlflow/mlflow",
+      },
+    ],
+  },
+];
+
+export const runnableProjects: RunnableProject[] = [
+  {
+    slug: "first-llm-eval",
+    title: "First LLM Eval Project",
+    level: "First build",
+    summary:
+      "Create a tiny evaluation harness that sends the same task examples to two prompts or models, scores the outputs, and prints a pass/fail report.",
+    lessonHref: "/lessons/llm-foundations",
+    professionalOutcome:
+      "You can decide whether an LLM change improved the system before shipping it, instead of relying on vibes or one impressive demo.",
+    prerequisites: [
+      "Know that a large language model generates text one token at a time.",
+      "Know what a prompt is: the instructions, examples, and context sent to the model.",
+      "Know what a test case is: an input plus the behavior you expect.",
+    ],
+    build: [
+      "Start with 3 task examples, then expand toward 12 examples with inputs, expected facts, and unacceptable mistakes.",
+      "Create two prompt variants so the learner can compare a baseline against a proposed change.",
+      "Run each example, store the model output, and score it with exact checks, rubric checks, or a model-graded judge.",
+      "Print a report with pass rate, failed examples, cost estimate, and a release recommendation.",
+    ],
+    starterFiles: ["eval_cases.jsonl", "prompts/baseline.txt", "prompts/candidate.txt", "run_eval.mjs"],
+    runCommand: "npm run eval:first-llm",
+    evalChecks: [
+      "All starter examples run without changing the evaluation code, and the harness is ready to expand toward 10 or more cases.",
+      "The report shows baseline score, candidate score, and every failed case.",
+      "A candidate prompt cannot pass if it omits required facts or invents unsupported facts.",
+    ],
+    failureModes: [
+      "The eval set is too small or too easy, so it cannot catch regressions.",
+      "A model judge rewards fluent answers even when they are factually wrong.",
+      "The team optimizes for the eval and forgets real user traffic.",
+    ],
+    sources: [
+      {
+        label: "OpenAI Cookbook: Getting Started with OpenAI Evals",
+        href: "https://cookbook.openai.com/examples/evaluation/getting_started_with_openai_evals",
+      },
+      {
+        label: "OpenAI Cookbook eval examples",
+        href: "https://cookbook.openai.com/topic/evals",
+      },
+      {
+        label: "Promptfoo GitHub repository",
+        href: "https://github.com/promptfoo/promptfoo",
+      },
+    ],
+  },
+  {
+    slug: "first-rag-app",
+    title: "First RAG App",
+    level: "First build",
+    summary:
+      "Build a local question-answering app over a small document folder, retrieve source chunks, and answer only when evidence is available.",
+    lessonHref: "/lessons/rag-systems",
+    professionalOutcome:
+      "You can build and debug the first working version of a cited knowledge assistant over real documents.",
+    prerequisites: [
+      "Know that retrieval-augmented generation means retrieving external evidence before generating an answer.",
+      "Know what a chunk is: a smaller searchable piece of a document.",
+      "Know what an embedding is: a vector representation used for semantic search.",
+    ],
+    build: [
+      "Create a docs folder with three short source documents and metadata such as title, URL, and date.",
+      "Chunk the documents, embed each chunk, and store the vectors in a local index.",
+      "Build a query route that retrieves top-k chunks, assembles a grounded prompt, and returns citations.",
+      "Add a refusal path when the retrieved evidence is weak or missing.",
+    ],
+    starterFiles: ["docs/", "scripts/ingest.mjs", "src/rag/retrieve.mjs", "src/rag/answer.mjs", "evals/rag_cases.jsonl"],
+    runCommand: "npm run rag:dev",
+    evalChecks: [
+      "Questions with known answers cite the right source document.",
+      "Out-of-scope questions return a refusal instead of an invented answer.",
+      "Changing chunk size or top-k changes measurable retrieval recall.",
+    ],
+    failureModes: [
+      "The right document exists but the retriever misses the needed chunk.",
+      "The model cites retrieved text that does not actually support the answer.",
+      "Long prompts crowd out the best evidence and make generation less faithful.",
+    ],
+    sources: [
+      {
+        label: "Lewis et al., Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+        href: "https://arxiv.org/abs/2005.11401",
+      },
+      {
+        label: "OpenAI embeddings guide",
+        href: "https://platform.openai.com/docs/guides/embeddings",
+      },
+      {
+        label: "OpenAI Cookbook: RAG with Elasticsearch",
+        href: "https://cookbook.openai.com/examples/vector_databases/elasticsearch/elasticsearch-retrieval-augmented-generation",
+      },
+      {
+        label: "LlamaIndex RAG introduction",
+        href: "https://developers.llamaindex.ai/python/framework/understanding/rag/",
+      },
+    ],
+  },
+  {
+    slug: "first-tool-using-agent",
+    title: "First Tool-Using Agent",
+    level: "First build",
+    summary:
+      "Build a step-limited agent with one read-only tool, strict argument validation, structured observations, and a trace of every decision.",
+    lessonHref: "/lessons/agents-and-tool-use",
+    professionalOutcome:
+      "You can separate model decision-making from application-side execution and inspect whether the workflow succeeded.",
+    prerequisites: [
+      "Know what an application programming interface is: a structured way for software to request work.",
+      "Know what a tool schema is: the required shape of valid tool arguments.",
+      "Know what state is: information carried from one step of the workflow to the next.",
+    ],
+    build: [
+      "Define one read-only tool, such as `search_docs`, with a narrow JSON schema.",
+      "Ask the model whether to answer directly or request the tool.",
+      "Validate every requested argument before executing the tool in application code.",
+      "Record a trace with user goal, tool call, arguments, observation, final answer, and stop reason.",
+    ],
+    starterFiles: ["src/agent/tools.mjs", "src/agent/run-agent.mjs", "src/agent/trace.mjs", "evals/agent_tasks.jsonl"],
+    runCommand: "npm run agent:first",
+    evalChecks: [
+      "The agent calls the tool when the answer requires external information.",
+      "Malformed or out-of-scope tool arguments are rejected before execution.",
+      "The loop stops within a fixed step limit and records a readable trace.",
+    ],
+    failureModes: [
+      "The model chooses the wrong tool or passes plausible but invalid arguments.",
+      "The loop keeps calling tools because the stop condition is weak.",
+      "A write action is added before permissions, approval, and audit logging exist.",
+    ],
+    sources: [
+      {
+        label: "Yao et al., ReAct",
+        href: "https://arxiv.org/abs/2210.03629",
+      },
+      {
+        label: "OpenAI function calling guide",
+        href: "https://platform.openai.com/docs/guides/function-calling",
+      },
+      {
+        label: "OpenAI Agents SDK quickstart",
+        href: "https://openai.github.io/openai-agents-js/guides/quickstart/",
+      },
+      {
+        label: "Anthropic, Building Effective Agents",
+        href: "https://www.anthropic.com/engineering/building-effective-agents",
+      },
+    ],
+  },
+  {
+    slug: "first-fine-tuning-dataset-eval-plan",
+    title: "First Fine-Tuning Dataset and Eval Plan",
+    level: "Builder",
+    summary:
+      "Prepare a small supervised fine-tuning dataset plan, split it correctly, define quality checks, and decide whether fine-tuning is justified.",
+    lessonHref: "/lessons/fine-tuning",
+    professionalOutcome:
+      "You can tell whether a fine-tuning idea has enough stable, high-quality data and a fair evaluation before spending training budget.",
+    prerequisites: [
+      "Know that supervised fine-tuning trains on example inputs and desired outputs.",
+      "Know that a train split teaches the model and a test split measures behavior after training.",
+      "Know why prompting, retrieval, or tool use may be better than fine-tuning for changing facts.",
+    ],
+    build: [
+      "Write a dataset card that states the target behavior, user population, privacy risks, and known exclusions.",
+      "Start with 4 example rows, then expand toward 50 examples with input, ideal output, task category, source, and reviewer notes.",
+      "Split examples into train, validation, and test sets without duplicates or leaked answers.",
+      "Define baseline, fine-tuned candidate, regression checks, and a no-ship threshold.",
+    ],
+    starterFiles: ["dataset_card.md", "data/examples.jsonl", "data/splits.json", "evals/fine_tune_eval_plan.md"],
+    runCommand: "npm run dataset:check",
+    evalChecks: [
+      "Every example has an input, ideal output, category, and review status.",
+      "No duplicate or near-duplicate examples cross train/test boundaries.",
+      "The plan includes baseline comparison, safety checks, and rollback criteria.",
+    ],
+    failureModes: [
+      "Fine-tuning is used to memorize changing facts that should live in retrieval.",
+      "Training examples teach style but the eval only checks correctness, or the reverse.",
+      "Private or sensitive data enters the training set without a documented review.",
+    ],
+    sources: [
+      {
+        label: "OpenAI supervised fine-tuning guide",
+        href: "https://platform.openai.com/docs/guides/supervised-fine-tuning",
+      },
+      {
+        label: "OpenAI fine-tuning best practices",
+        href: "https://platform.openai.com/docs/guides/fine-tuning-best-practices",
+      },
+      {
+        label: "Hu et al., LoRA",
+        href: "https://arxiv.org/abs/2106.09685",
+      },
+      {
+        label: "Hugging Face TRL SFTTrainer documentation",
+        href: "https://huggingface.co/docs/trl/sft_trainer",
+      },
+    ],
+  },
+  {
+    slug: "first-production-observability-eval-gate",
+    title: "First Production AI Observability and Eval Gate",
+    level: "Production gate",
+    summary:
+      "Add tracing, metrics, and a pre-release evaluation gate to one AI workflow so production changes are measurable and reversible.",
+    lessonHref: "/lessons/ai-systems",
+    professionalOutcome:
+      "You can ship a model, prompt, retrieval, or tool change with a basic release gate, trace inspection, and rollback signal.",
+    prerequisites: [
+      "Know what a trace is: a record of steps inside one request or workflow.",
+      "Know what a metric is: a numeric measurement tracked over time.",
+      "Know what an evaluation gate is: a release check that blocks changes when quality drops below a threshold.",
+    ],
+    build: [
+      "Instrument one AI route with request ID, model version, prompt version, latency, token usage, tool calls, retrieval IDs, and final status.",
+      "Create a frozen eval set that runs before release and compares the current workflow against the candidate.",
+      "Set pass/fail thresholds for answer quality, refusal quality, latency, cost, and unsupported claims.",
+      "Write a release note template that records what changed, what passed, what failed, and how to roll back.",
+    ],
+    starterFiles: ["src/observability/trace.mjs", "evals/release_gate.jsonl", "scripts/run-release-gate.mjs", "docs/release-note-template.md"],
+    runCommand: "npm run release:gate",
+    evalChecks: [
+      "Every eval run records model, prompt, data, and tool versions.",
+      "The gate fails when quality drops, cost exceeds budget, or unsupported answers increase.",
+      "A developer can inspect one failed trace and identify which stage caused the failure.",
+    ],
+    failureModes: [
+      "Logs capture final answers but not retrieval chunks, tool observations, or prompt versions.",
+      "The gate checks average quality but misses high-risk failure slices.",
+      "There is no rollback path after a model or prompt regression reaches users.",
+    ],
+    sources: [
+      {
+        label: "OpenAI production best practices",
+        href: "https://platform.openai.com/docs/guides/production-best-practices",
+      },
+      {
+        label: "OpenTelemetry GenAI semantic conventions",
+        href: "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+      },
+      {
+        label: "MLflow GenAI tracing documentation",
+        href: "https://mlflow.org/docs/latest/genai/tracing/",
+      },
+      {
+        label: "Google SRE Book: Monitoring Distributed Systems",
+        href: "https://sre.google/sre-book/monitoring-distributed-systems/",
       },
     ],
   },

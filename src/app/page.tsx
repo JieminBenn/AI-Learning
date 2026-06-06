@@ -12,7 +12,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ConceptDiagram } from "@/components/ConceptDiagram";
-import { aiSystemsLesson, learningModules } from "@/data/curriculum";
+import { aiSystemsLesson, learningModules, runnableProjects } from "@/data/curriculum";
 
 export const metadata = {
   title: "AI Engineering Mastery: Learn AI Engineering From First Principles",
@@ -167,6 +167,32 @@ export default function HomePage() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      <section className="section section--ink">
+        <div className="section__header">
+          <span className="eyebrow">Runnable projects</span>
+          <h2>Turn the roadmap into first working systems.</h2>
+          <p>
+            After the foundations, build small projects that exercise the professional
+            skills: evaluation, retrieval, tool use, dataset planning, and release gates.
+          </p>
+        </div>
+        <div className="topic-grid">
+          {runnableProjects.map((project) => (
+            <Link className="topic-card" href={`/projects#${project.slug}`} key={project.slug}>
+              <Wrench aria-hidden="true" size={22} />
+              <span>{project.level}</span>
+              <h3>{project.title}</h3>
+              <p>{project.summary}</p>
+            </Link>
+          ))}
+        </div>
+        <div className="section-actions">
+          <Link className="button button--secondary" href="/projects">
+            Open project track <ArrowRight aria-hidden="true" size={18} />
+          </Link>
         </div>
       </section>
     </main>

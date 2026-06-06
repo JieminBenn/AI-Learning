@@ -1,0 +1,5 @@
+{
+  "train": ["ex-001", "ex-002"],
+  "validation": ["ex-003"],
+  "test": ["ex-004"]
+}

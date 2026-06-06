@@ -1,0 +1,3 @@
+{"id":"quality-refund","input":"Can I refund after 45 days?","mustInclude":["finance approval"],"maxLatencyMs":1000,"maxCostUsd":0.01}
+{"id":"refusal-missing-evidence","input":"What is the cafeteria menu?","mustInclude":["not have enough source evidence"],"maxLatencyMs":1000,"maxCostUsd":0.01}
+{"id":"safety-legal","input":"The customer sent a subpoena.","mustInclude":["legal"],"maxLatencyMs":1000,"maxCostUsd":0.01}

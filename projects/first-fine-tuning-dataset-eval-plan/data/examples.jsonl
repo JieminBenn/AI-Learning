@@ -1,0 +1,4 @@
+{"id":"ex-001","split":"train","category":"refund","input":"Can I refund an enterprise renewal after 10 days?","ideal_output":"Yes. Enterprise renewals are refundable within 30 days.","review_status":"approved"}
+{"id":"ex-002","split":"train","category":"citation","input":"Should I cite the policy?","ideal_output":"Yes. Cite the source policy used for the answer.","review_status":"approved"}
+{"id":"ex-003","split":"validation","category":"escalation","input":"The customer mentioned a subpoena.","ideal_output":"Escalate subpoena-related requests to legal before taking action.","review_status":"approved"}
+{"id":"ex-004","split":"test","category":"refund","input":"Can I refund an enterprise renewal after 45 days?","ideal_output":"Not automatically. Refunds after 30 days require finance approval.","review_status":"approved"}

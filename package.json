@@ -19,7 +19,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:first-llm": "node projects/first-llm-eval/run_eval.mjs",
+    "rag:dev": "node projects/first-rag-app/src/rag/answer.mjs",
+    "agent:first": "node projects/first-tool-using-agent/src/agent/run-agent.mjs",
+    "dataset:check": "node projects/first-fine-tuning-dataset-eval-plan/check_dataset.mjs",
+    "release:gate": "node projects/first-production-observability-eval-gate/scripts/run-release-gate.mjs"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, CheckCircle2, Map } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, FolderKanban, Map } from "lucide-react";
 import { LearningModuleCard } from "@/components/LearningModuleCard";
 import {
   agentsAndToolUseLesson,
@@ -10,6 +10,7 @@ import {
   learningModules,
   llmFoundationsLesson,
   ragSystemsLesson,
+  runnableProjects,
   topics,
 } from "@/data/curriculum";
 
@@ -40,6 +41,41 @@ export default function CurriculumPage() {
         <div className="path-grid">
           {learningModules.map((module) => (
             <LearningModuleCard key={module.title} {...module} />
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section__header">
+          <span className="eyebrow">Project track</span>
+          <h2>Small runnable projects that prove the concepts.</h2>
+          <p>
+            Use these as the bridge between reading lessons and building professional
+            AI systems. Each project includes starter files, a run command, eval checks,
+            failure modes, and primary sources.
+          </p>
+        </div>
+        <div className="path-grid project-summary-grid">
+          {runnableProjects.map((project) => (
+            <Link className="learning-card" href={`/projects#${project.slug}`} key={project.slug}>
+              <div className="learning-card__header">
+                <h3>{project.title}</h3>
+                <span>{project.level}</span>
+              </div>
+              <p>{project.summary}</p>
+              <div className="module-label">
+                <FolderKanban aria-hidden="true" size={18} />
+                {project.runCommand}
+              </div>
+              <ul>
+                {project.evalChecks.slice(0, 2).map((check) => (
+                  <li key={check}>
+                    <CheckCircle2 aria-hidden="true" size={16} />
+                    {check}
+                  </li>
+                ))}
+              </ul>
+            </Link>
           ))}
         </div>
       </section>

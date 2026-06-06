@@ -1,0 +1,3 @@
+{"id":"refund-window","input":"Can I refund an enterprise renewal after 45 days?","required":["30 days","enterprise renewal"],"forbidden":["45 days is allowed"],"expected":"Enterprise renewals can be refunded within 30 days."}
+{"id":"cite-policy","input":"Answer with the policy name for refunds.","required":["Refund Policy"],"forbidden":["I think"],"expected":"The answer should name the Refund Policy."}
+{"id":"escalate-risk","input":"The customer threatens legal action. What should support do?","required":["escalate","legal"],"forbidden":["process the refund"],"expected":"Escalate legal threats instead of processing automatically."}
