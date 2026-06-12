@@ -6,6 +6,9 @@ export const metadata = {
   title: "Must-Know AI Models and Model Families",
   description:
     "A curated guide to the model families AI engineers should know, including Transformers, BERT, GPT-style decoders, CLIP, diffusion models, and embedding models.",
+  alternates: {
+    canonical: "/models",
+  },
 };
 
 export default function ModelsPage() {

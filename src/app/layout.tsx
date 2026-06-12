@@ -1,52 +1,34 @@
 import type { Metadata } from "next";
 import { Navigation } from "@/components/Navigation";
+import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
-const siteUrl = "https://ai-learning-tau-steel.vercel.app";
-const siteName = "AI Engineering Mastery";
-const siteDescription =
-  "A beginner-friendly AI engineering curriculum for learning Transformers, large language models, RAG, AI agents, fine-tuning, model literacy, and production AI infrastructure from first principles.";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
   title: {
-    default: siteName,
-    template: `%s | ${siteName}`,
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`,
   },
-  description: siteDescription,
-  keywords: [
-    "AI engineering",
-    "learn AI",
-    "machine learning engineering",
-    "large language models",
-    "LLM engineering",
-    "Transformers",
-    "Attention Is All You Need",
-    "retrieval augmented generation",
-    "RAG",
-    "AI agents",
-    "fine-tuning",
-    "AI infrastructure",
-    "model literacy",
-    "prompt engineering",
-  ],
-  authors: [{ name: "Jiemin Benn" }],
-  creator: "Jiemin Benn",
-  publisher: siteName,
-  alternates: {
-    canonical: "/",
-  },
+  description: siteConfig.description,
+  keywords: [...siteConfig.keywords],
+  authors: [{ name: siteConfig.author }],
+  creator: siteConfig.author,
+  publisher: siteConfig.name,
+  category: "education",
+  classification: "AI engineering education",
   openGraph: {
     type: "website",
-    url: siteUrl,
-    title: siteName,
-    description: siteDescription,
-    siteName,
+    url: siteConfig.url,
+    title: siteConfig.name,
+    description: siteConfig.description,
+    siteName: siteConfig.name,
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: siteName,
-    description: siteDescription,
+    title: siteConfig.name,
+    description: siteConfig.description,
   },
   robots: {
     index: true,

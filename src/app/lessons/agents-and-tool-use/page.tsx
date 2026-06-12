@@ -6,6 +6,9 @@ export const metadata = {
   title: "Agents and Tool Use Explained for AI Engineers",
   description:
     "A beginner-to-builder guide to AI agents and tool use, covering tool schemas, function calling, agent loops, ReAct, Toolformer, handoffs, memory, guardrails, tracing, evaluation, and production failure modes.",
+  alternates: {
+    canonical: "/lessons/agents-and-tool-use",
+  },
 };
 
 export default function AgentsAndToolUseLessonPage() {
@@ -15,4 +18,3 @@ export default function AgentsAndToolUseLessonPage() {
     </LessonShell>
   );
 }
-

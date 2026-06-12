@@ -18,6 +18,9 @@ export const metadata = {
   title: "Runnable AI Engineering Projects",
   description:
     "Small runnable AI engineering projects for LLM evaluation, RAG, tool-using agents, fine-tuning dataset planning, and production AI observability gates.",
+  alternates: {
+    canonical: "/projects",
+  },
 };
 
 const projectIcons = [ClipboardCheck, BookOpenCheck, Code2, FileCode2, ShieldCheck];

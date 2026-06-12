@@ -6,6 +6,9 @@ export const metadata = {
   title: "Fine-Tuning Explained for AI Engineers",
   description:
     "A beginner-to-builder guide to fine-tuning language models, covering supervised fine-tuning, LoRA, QLoRA, preference optimization, dataset quality, evaluation, and production failure modes.",
+  alternates: {
+    canonical: "/lessons/fine-tuning",
+  },
 };
 
 export default function FineTuningLessonPage() {

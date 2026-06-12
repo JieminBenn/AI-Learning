@@ -19,6 +19,9 @@ export const metadata = {
   title: "AI Engineering Curriculum Overview",
   description:
     "A beginner-to-professional AI engineering curriculum covering Transformers, LLM foundations, RAG, agents, data pipelines, training, fine-tuning, and infrastructure.",
+  alternates: {
+    canonical: "/curriculum",
+  },
 };
 
 export default function CurriculumPage() {

@@ -2,7 +2,7 @@
 
 **AI Engineering Mastery** is a beginner-friendly, professional-depth curriculum for learning artificial intelligence engineering from first principles.
 
-Live site: [https://ai-learning-tau-steel.vercel.app](https://ai-learning-tau-steel.vercel.app)
+Live site: [https://www.ailearning-engineering.com](https://www.ailearning-engineering.com)
 
 ## What This Teaches
 

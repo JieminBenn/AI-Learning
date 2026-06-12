@@ -18,6 +18,9 @@ export const metadata = {
   title: "AI Engineering Mastery: Learn AI Engineering From First Principles",
   description:
     "A practical AI engineering curriculum for beginners and builders: Transformers, LLMs, RAG, AI agents, fine-tuning, model literacy, and production AI infrastructure.",
+  alternates: {
+    canonical: "/",
+  },
 };
 
 const moduleIcons = [

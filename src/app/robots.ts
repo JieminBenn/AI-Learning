@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getSiteUrl, siteConfig } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -6,6 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://ai-learning-tau-steel.vercel.app/sitemap.xml",
+    sitemap: getSiteUrl("/sitemap.xml"),
+    host: siteConfig.url,
   };
 }

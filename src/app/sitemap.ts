@@ -10,88 +10,56 @@ import {
   trainingRunsLesson,
   topics,
 } from "@/data/curriculum";
+import { getSiteUrl } from "@/lib/site";
 
-const baseUrl = "https://ai-learning-tau-steel.vercel.app";
+const lastModified = new Date("2026-06-12");
+
+const lessonSlugs = [
+  attentionLesson.slug,
+  llmFoundationsLesson.slug,
+  ragSystemsLesson.slug,
+  agentsAndToolUseLesson.slug,
+  dataPipelinesLesson.slug,
+  trainingRunsLesson.slug,
+  fineTuningLesson.slug,
+  aiSystemsLesson.slug,
+];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
-
   return [
     {
-      url: baseUrl,
-      lastModified: now,
+      url: getSiteUrl(),
+      lastModified,
       changeFrequency: "weekly",
       priority: 1,
     },
     {
-      url: `${baseUrl}/models`,
-      lastModified: now,
+      url: getSiteUrl("/curriculum"),
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.95,
+    },
+    {
+      url: getSiteUrl("/projects"),
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: getSiteUrl("/models"),
+      lastModified,
       changeFrequency: "monthly",
       priority: 0.8,
     },
-    {
-      url: `${baseUrl}/curriculum`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/projects`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.85,
-    },
-    {
-      url: `${baseUrl}/lessons/${attentionLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
+    ...lessonSlugs.map((slug) => ({
+      url: getSiteUrl(`/lessons/${slug}`),
+      lastModified,
+      changeFrequency: "monthly" as const,
       priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${llmFoundationsLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${ragSystemsLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${agentsAndToolUseLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${dataPipelinesLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${trainingRunsLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${fineTuningLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
-    {
-      url: `${baseUrl}/lessons/${aiSystemsLesson.slug}`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.9,
-    },
+    })),
     ...topics.map((topic) => ({
-      url: `${baseUrl}/topics/${topic.slug}`,
-      lastModified: now,
+      url: getSiteUrl(`/topics/${topic.slug}`),
+      lastModified,
       changeFrequency: "monthly" as const,
       priority: 0.7,
     })),
