@@ -1,6 +1,6 @@
 # AI Engineering Mastery
 
-**AI Engineering Mastery** is a beginner-friendly, professional-depth curriculum for learning artificial intelligence engineering from first principles.
+**AI Engineering Mastery** is a beginner-friendly, professional-depth curriculum for learning the AI engineering skills that matter for real jobs without unnecessary detours.
 
 Live site: [https://www.ailearning-engineering.com](https://www.ailearning-engineering.com)
 
@@ -16,7 +16,7 @@ This website helps learners build real understanding of modern AI systems, inclu
 - Embeddings, model families, and model literacy
 - AI infrastructure, evaluation, monitoring, latency, and cost tradeoffs
 
-The goal is not shallow vocabulary recognition. The lessons are designed so a motivated beginner can explain the ideas, trace the systems, reason about failure modes, and understand where each concept appears in production AI engineering work.
+The goal is not shallow vocabulary recognition or encyclopedia-style coverage. The lessons are designed so a motivated beginner can explain the ideas, trace the systems, reason about failure modes, and understand where each concept appears in production AI engineering work.
 
 ## Why It Exists
 

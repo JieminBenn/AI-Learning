@@ -15,9 +15,9 @@ import { ConceptDiagram } from "@/components/ConceptDiagram";
 import { aiSystemsLesson, learningModules, runnableProjects, trainingRunsLesson } from "@/data/curriculum";
 
 export const metadata = {
-  title: "AI Engineering Mastery: Learn AI Engineering From First Principles",
+  title: "AI Engineering Mastery: Job-Focused AI Engineering Curriculum",
   description:
-    "A practical AI engineering curriculum for beginners and builders: Transformers, LLMs, RAG, AI agents, fine-tuning, model literacy, and production AI infrastructure.",
+    "Learn the AI engineering skills needed for real jobs: Transformers, LLMs, RAG, agents, fine-tuning, evaluation, and production systems without unnecessary detours.",
   alternates: {
     canonical: "/",
   },
@@ -77,11 +77,11 @@ export default function HomePage() {
           <span className="eyebrow">From zero foundation to professional AI work</span>
           <h1>AI Engineering Mastery</h1>
           <p>
-            Learn artificial intelligence engineering from first principles: Transformers,
-            large language models, retrieval-augmented generation, AI agents, fine-tuning,
-            model literacy, and production infrastructure. Start with plain-language
-            intuition, then climb toward papers, architectures, workflows, and professional
-            reasoning.
+            Learn the artificial intelligence engineering skills you actually need for
+            real jobs: Transformers, large language models, retrieval-augmented
+            generation, AI agents, fine-tuning, model literacy, and production
+            infrastructure. No encyclopedia-style detours; each topic is chosen because
+            it shows up in professional AI systems.
           </p>
           <div className="hero__actions">
             <Link className="button button--primary" href="#learning-roadmap">
@@ -109,6 +109,8 @@ export default function HomePage() {
           <p>
             The curriculum starts with Transformer basics, then expands into LLMs,
             RAG, agents, data pipelines, training, fine-tuning, and production systems.
+            Every module is selected for job-ready understanding, implementation, or
+            debugging work.
           </p>
         </div>
 

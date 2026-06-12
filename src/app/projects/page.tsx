@@ -17,7 +17,7 @@ import { runnableProjects } from "@/data/curriculum";
 export const metadata = {
   title: "Runnable AI Engineering Projects",
   description:
-    "Small runnable AI engineering projects for LLM evaluation, RAG, tool-using agents, fine-tuning dataset planning, and production AI observability gates.",
+    "Job-focused AI engineering projects that practice the skills used in real work: LLM evaluation, RAG, tool-using agents, fine-tuning data, and production observability gates.",
   alternates: {
     canonical: "/projects",
   },
@@ -35,7 +35,9 @@ export default function ProjectsPage() {
           <p>
             These projects turn the curriculum into small, inspectable systems.
             Each one has a beginner starting point, concrete files, a run command,
-            evaluation checks, and production failure modes to watch for.
+            evaluation checks, and production failure modes to watch for. The goal is
+            to practice what AI engineers need on the job, not to collect unrelated
+            concepts.
           </p>
         </div>
         <aside className="project-hero__panel" aria-label="Project track summary">

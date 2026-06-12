@@ -16,9 +16,9 @@ import {
 } from "@/data/curriculum";
 
 export const metadata = {
-  title: "AI Engineering Curriculum Overview",
+  title: "Job-Focused AI Engineering Curriculum Overview",
   description:
-    "A beginner-to-professional AI engineering curriculum covering Transformers, LLM foundations, RAG, agents, data pipelines, training, fine-tuning, and infrastructure.",
+    "A job-focused AI engineering curriculum that teaches the practical topics needed for real AI work: Transformers, LLMs, RAG, agents, data pipelines, training, fine-tuning, and infrastructure.",
   alternates: {
     canonical: "/curriculum",
   },
@@ -31,9 +31,11 @@ export default function CurriculumPage() {
         <span className="eyebrow">Curriculum overview</span>
         <h1>Learn AI the way professionals actually use it.</h1>
         <p>
-          This roadmap starts with basic vocabulary and grows into paper reading,
-          Transformer basics, LLM behavior, retrieval systems, agents, data pipelines,
-          training, fine-tuning, and infrastructure.
+          This roadmap starts with basic vocabulary and grows into the topics that
+          matter for real AI jobs: paper reading, Transformer basics, LLM behavior,
+          retrieval systems, agents, data pipelines, training, fine-tuning, and
+          infrastructure. It is intentionally selective, so beginners can focus on
+          useful professional skills instead of unnecessary detours.
         </p>
       </section>
 
