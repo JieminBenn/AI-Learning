@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   publisher: siteConfig.name,
   category: "education",
   classification: "AI engineering education",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+  },
   openGraph: {
     type: "website",
     url: siteConfig.url,
@@ -24,11 +27,20 @@ export const metadata: Metadata = {
     description: siteConfig.description,
     siteName: siteConfig.name,
     locale: "en_US",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "AI Engineering Mastery preview showing a practical AI systems learning workspace",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: siteConfig.name,
     description: siteConfig.description,
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AI Engineering Mastery icon">
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="156" fill="#10243f" stroke="#38bdf8" stroke-width="18"/>
+  <path d="M166 328 226 176h54l66 152h-48l-13-34h-70l-12 34h-37Zm60-71h46l-24-65-22 65Zm139 71V176h47v152h-47Z" fill="#f8fafc"/>
+  <circle cx="158" cy="160" r="22" fill="#14b8a6"/>
+  <circle cx="354" cy="154" r="18" fill="#f59e0b"/>
+  <circle cx="366" cy="354" r="20" fill="#38bdf8"/>
+  <path d="M177 171 227 224m110-58-57 58m74 116-64-55" fill="none" stroke="#94a3b8" stroke-width="14" stroke-linecap="round"/>
+</svg>
